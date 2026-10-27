@@ -29,6 +29,18 @@ server {
     try_files $uri =404;
   }
 
+  # Las fuentes no cambian: se cachean un mes.
+  location /fonts/ {
+    expires 30d;
+    try_files $uri =404;
+  }
+
+  # Algunas versiones de nginx no conocen la extensión .webmanifest.
+  location = /manifest.webmanifest {
+    types { } default_type application/manifest+json;
+    expires 1d;
+  }
+
   location /admin/ {
     expires -1;
     add_header X-Robots-Tag "noindex, nofollow" always;

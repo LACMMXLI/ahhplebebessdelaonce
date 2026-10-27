@@ -2,8 +2,9 @@ import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import { query } from '../db.js';
+import { config } from '../config.js';
 import { requireAuth } from '../auth.js';
-import { deleteImage, imageUrl, saveImage } from '../storage.js';
+import { deleteImage, imageUrl, saveImage, thumbUrl } from '../storage.js';
 import { HttpError, idParam, parse, precio, wrap } from '../http.js';
 import { loadSettings } from './public.js';
 
@@ -62,7 +63,7 @@ const platilloSchema = z.object({
   orden: z.coerce.number().int().min(0).max(9999).default(0),
 }).refine((d) => !d.activo || d.precio > 0, { message: 'Para publicar el platillo ponle un precio', path: ['precio'] });
 
-const present = ({ imagen_key, ...p }) => ({ ...p, imagen_url: imageUrl(imagen_key) });
+const present = ({ imagen_key, ...p }) => ({ ...p, imagen_url: imageUrl(imagen_key), imagen_thumb_url: thumbUrl(imagen_key) });
 
 const dbError = (e) => {
   if (e.code === '23503') throw new HttpError(400, 'La categoría no existe');
@@ -130,11 +131,11 @@ const ESTADOS = ['nuevo', 'preparando', 'listo', 'entregado', 'cancelado'];
 
 router.get('/pedidos', wrap(async (req, res) => {
   const estado = req.query.estado;
-  if (estado && !ESTADOS.includes(estado) && estado !== 'activos') throw new HttpError(400, 'Estado inválido');
+  const GRUPOS = { activos: "p.estado IN ('nuevo','preparando','listo')", historial: "p.estado IN ('entregado','cancelado')" };
+  if (estado && !ESTADOS.includes(estado) && !GRUPOS[estado]) throw new HttpError(400, 'Estado inválido');
   const limit = Math.min(Number(req.query.limit) || 100, 300);
-  const where = estado === 'activos' ? "WHERE p.estado IN ('nuevo','preparando','listo')"
-    : estado ? 'WHERE p.estado = $2' : '';
-  const params = estado && estado !== 'activos' ? [limit, estado] : [limit];
+  const where = GRUPOS[estado] ? `WHERE ${GRUPOS[estado]}` : estado ? 'WHERE p.estado = $2' : '';
+  const params = estado && !GRUPOS[estado] ? [limit, estado] : [limit];
   const { rows } = await query(
     `SELECT p.*, COALESCE(json_agg(json_build_object(
               'nombre', i.nombre, 'cantidad', i.cantidad, 'precio_unitario', i.precio_unitario, 'nota', i.nota)
@@ -145,10 +146,17 @@ router.get('/pedidos', wrap(async (req, res) => {
 }));
 
 router.get('/pedidos/resumen', wrap(async (_req, res) => {
+  // "Hoy" se calcula en la zona horaria del negocio, no en la del servidor.
   const { rows } = await query(
     `SELECT count(*) FILTER (WHERE estado='nuevo')::int AS nuevos,
-            count(*) FILTER (WHERE estado IN ('nuevo','preparando','listo'))::int AS activos
-     FROM pedidos`);
+            count(*) FILTER (WHERE estado='preparando')::int AS preparando,
+            count(*) FILTER (WHERE estado='listo')::int AS listos,
+            count(*) FILTER (WHERE estado IN ('nuevo','preparando','listo'))::int AS activos,
+            count(*) FILTER (WHERE (created_at AT TIME ZONE $1)::date = (now() AT TIME ZONE $1)::date
+                               AND estado <> 'cancelado')::int AS hoy,
+            COALESCE(sum(total) FILTER (WHERE (created_at AT TIME ZONE $1)::date = (now() AT TIME ZONE $1)::date
+                               AND estado <> 'cancelado'), 0) AS ventas_hoy
+     FROM pedidos`, [config.timezone]);
   res.json(rows[0]);
 }));
 

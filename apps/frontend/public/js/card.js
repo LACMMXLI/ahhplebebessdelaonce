@@ -1,5 +1,6 @@
 import { h, loadSettings, safeUrl, telHref, waHref, toast, DEFAULT_SETTINGS } from './lib.js';
 import { icon } from './icons.js';
+import { embers, reveal, ripples } from './fx.js';
 
 const root = document.getElementById('card');
 
@@ -25,7 +26,7 @@ function vcard(s) {
 }
 
 async function share(s) {
-  const data = { title: s.nombre, text: `¡Conoce ${s.nombre}!`, url: location.origin + '/' };
+  const data = { title: s.nombre, text: `¡Conoce ${s.nombre}!`, url: `${location.origin}/` };
   if (navigator.share) {
     try { await navigator.share(data); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
@@ -33,55 +34,65 @@ async function share(s) {
   catch { toast(`Comparte este enlace: ${data.url}`); }
 }
 
-const link = (props, ...kids) => h('a', props, ...kids);
+const chev = () => h('span', { class: 'chev' }, icon('chevron'));
+const external = { target: '_blank', rel: 'noopener noreferrer' };
+let first = true;
 
 function render(s) {
   const wa = waHref(s);
-  const socialDefs = [
+  const social = [
     ['facebook', 'Facebook', safeUrl(s.facebook)],
+    ['whatsapp', 'WhatsApp', wa],
     ['tiktok', 'TikTok', safeUrl(s.tiktok)],
     ['instagram', 'Instagram', safeUrl(s.instagram)],
     ['youtube', 'YouTube', safeUrl(s.youtube)],
   ].filter(([, , href]) => href); // lo que no tiene enlace no se muestra
 
   const maps = safeUrl(s.maps) || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.direccion)}`;
+  const [l1, l2] = s.slogan.split(/(?<=\.)\s+/);
+
   const nodes = [
     h('h1', { class: 'title' }, s.nombre),
-    h('div', { class: 'categories' }, 'BURGERS · BURRITOS · HOT DOGS · SNACKS'),
-    h('div', { class: 'line', 'aria-hidden': 'true' }),
-    h('p', { class: 'slogan' }, ...s.slogan.split('. ').map((t, i, a) => [t + (i < a.length - 1 ? '.' : ''), i < a.length - 1 ? h('br') : null])),
-    s.horario ? h('p', { class: 'horario' }, `🕒 ${s.horario}`) : null,
-    socialDefs.length
-      ? h('nav', { class: 'socials', 'aria-label': 'Redes sociales' }, socialDefs.map(([k, label, href]) =>
-        link({ class: `social ${k}`, href, target: '_blank', rel: 'noopener noreferrer' }, icon(k), label)))
-      : null,
-    link({ class: 'big cta-menu', href: 'menu/' },
-      icon('burger'),
-      h('span', {}, h('strong', {}, 'Ver menú digital'), h('small', {}, s.pedidos_activos ? 'Arma tu pedido y envíalo por WhatsApp' : 'Descubre todos nuestros platillos')),
-      h('span', { class: 'chev' }, icon('chevron'))),
-    h('div', { class: 'pair' },
-      link({ class: 'big', href: telHref(s) }, icon('phone'),
-        h('span', {}, h('strong', {}, 'Llamar ahora'), h('small', {}, s.telefono))),
-      wa ? link({ class: 'big wa', href: wa, target: '_blank', rel: 'noopener noreferrer' }, icon('whatsapp'),
-        h('span', {}, h('strong', {}, 'WhatsApp'), h('small', {}, s.telefono))) : null),
-    link({ class: 'big info first', href: maps, target: '_blank', rel: 'noopener noreferrer' },
-      h('span', { class: 'sym red' }, icon('pin')),
-      h('span', {}, h('strong', {}, 'Cómo llegar'), h('small', {}, s.direccion)),
-      h('span', { class: 'chev' }, icon('chevron'))),
-    h('button', { class: 'big info', type: 'button', onclick: () => vcard(s) },
-      h('span', { class: 'sym blue' }, icon('user')),
-      h('span', {}, h('strong', {}, 'Guardar contacto'), h('small', {}, 'Agrega nuestros datos a tu celular')),
-      h('span', { class: 'chev' }, icon('chevron'))),
-    h('button', { class: 'big info', type: 'button', onclick: () => share(s) },
-      h('span', { class: 'sym purple' }, icon('share')),
-      h('span', {}, h('strong', {}, 'Compartir tarjeta'), h('small', {}, 'Comparte nuestro restaurante')),
-      h('span', { class: 'chev' }, icon('chevron'))),
-    h('div', { class: 'footer' }, 'El antojo siempre sabe mejor ✨'),
+    h('p', { class: 'cats' }, 'BURGERS · BURRITOS · HOT DOGS · SNACKS'),
+    h('i', { class: 'rule', 'aria-hidden': 'true' }),
+    h('p', { class: 'slogan' }, l1, l2 ? [h('br'), l2] : null),
+    s.horario ? h('p', { class: 'hours' }, icon('clock'), s.horario) : null,
+    social.length ? h('nav', { class: 'tiles rv', 'aria-label': 'Redes sociales' }, social.map(([k, label, href]) =>
+      h('a', { class: `tile ${k} rp lift`, href, ...external }, icon(k), label))) : null,
+    h('a', { class: 'cta rp lift rv', href: 'menu/' },
+      icon('burger', 'cta-ico'),
+      h('span', { class: 'cta-txt' }, h('b', {}, 'Ver menú digital'),
+        h('small', {}, s.pedidos_activos ? 'Descubre todos nuestros platillos y pide' : 'Descubre todos nuestros platillos')),
+      icon('burgerGhost', 'cta-ghost'), chev()),
+    h('div', { class: 'duo rv' },
+      h('a', { class: 'pill rp lift', href: telHref(s) }, icon('phone'),
+        h('span', {}, h('b', {}, 'Llamar ahora'), h('small', {}, s.telefono)), chev()),
+      wa ? h('a', { class: 'pill wa rp lift', href: wa, ...external }, icon('waline'),
+        h('span', {}, h('b', {}, 'WhatsApp'), h('small', {}, s.telefono)), chev()) : null),
+    h('a', { class: 'row row-map first rp lift rv', href: maps, ...external },
+      h('span', { class: 'row-ico pin' }, icon('pin')),
+      h('span', { class: 'row-txt' }, h('b', {}, 'Cómo llegar'), h('small', {}, s.direccion)),
+      icon('map', 'art'), chev()),
+    h('button', { class: 'row row-vcard rp lift rv', type: 'button', onclick: () => vcard(s) },
+      h('span', { class: 'row-ico' }, icon('user')),
+      h('span', { class: 'row-txt' }, h('b', {}, 'Guardar contacto'), h('small', {}, 'Agrega nuestros datos a tu celular')),
+      icon('phoneArt', 'art'), chev()),
+    h('button', { class: 'row row-share rp lift rv', type: 'button', onclick: () => share(s) },
+      h('span', { class: 'row-ico' }, icon('share')),
+      h('span', { class: 'row-txt' }, h('b', {}, 'Compartir tarjeta'), h('small', {}, 'Comparte nuestro restaurante')),
+      icon('arrowArt', 'art'), chev()),
+    h('div', { class: 'sign rv' },
+      h('span', { class: 'sign-txt' }, h('span', { class: 'script' }, 'El antojo siempre sabe mejor'), icon('underline', 'sign-line')),
+      icon('crown', 'crown')),
   ];
   root.replaceChildren(...nodes.filter(Boolean));
   document.title = `${s.nombre} · Tarjeta digital`;
+  // El título y el eslogan ya están en pantalla; el resto aparece escalonado al hacer scroll.
+  if (first) { first = false; reveal(root); } else root.querySelectorAll('.rv').forEach((el) => { el.classList.add('in'); el.style.animation = 'none'; el.style.opacity = '1'; el.style.transform = 'none'; });
 }
 
+embers();
+ripples();
 // Pinta al instante con los datos por defecto (la tarjeta funciona aunque el backend esté caído)
 // y se actualiza en cuanto el servidor responde.
 render(DEFAULT_SETTINGS);

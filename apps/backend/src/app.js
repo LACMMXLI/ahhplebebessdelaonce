@@ -12,7 +12,7 @@ import adminRoutes from './routes/admin.js';
 
 export function createApp() {
   const app = express();
-  app.set('trust proxy', 1); // detrás del proxy de Coolify (para el rate limit por IP)
+  app.set('trust proxy', config.trustProxy); // detrás del proxy de Coolify (para el rate limit por IP)
   app.disable('x-powered-by');
   app.use(helmet());
   app.use(cors({

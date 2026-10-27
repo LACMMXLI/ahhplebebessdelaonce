@@ -10,6 +10,10 @@ const list = (v) => (v || '').split(',').map((s) => s.trim().replace(/\/$/, ''))
 
 export const config = {
   port: Number(env.PORT) || 3000,
+  // Saltos de proxy delante de la API (Traefik de Coolify = 1; con Cloudflare delante, 2).
+  trustProxy: Number(env.TRUST_PROXY ?? 1),
+  // Zona horaria del negocio (para "hoy" en las estadísticas). Mexicali usa la del Pacífico.
+  timezone: env.BUSINESS_TZ || 'America/Tijuana',
   databaseUrl: required('DATABASE_URL'),
   // En producción no hay valor por defecto: un secreto débil invalidaría el login.
   jwtSecret: required('JWT_SECRET'),
