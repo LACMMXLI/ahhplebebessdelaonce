@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d11">
+<title>Menú · Ahh Plebes de la Once</title>
+<meta name="description" content="Menú digital de Ahh Plebes de la Once. Arma tu pedido y envíalo por WhatsApp.">
+<meta property="og:title" content="Menú · Ahh Plebes de la Once">
+<meta property="og:description" content="Burgers, burritos, hot dogs y snacks. Arma tu pedido y envíalo por WhatsApp.">
+<meta property="og:image" content="__SITE_URL__/assets/og.jpg">
+<meta property="og:url" content="__SITE_URL__/menu/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="../assets/favicon.png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="stylesheet" href="../css/app.css">
+</head>
+<body>
+<main class="wrap">
+  <header class="mhead">
+    <div class="mbar">
+      <a class="back" href="../" aria-label="Volver a la tarjeta"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></a>
+      <img src="../assets/logo.webp" width="40" height="40" alt="">
+      <div><h1>Menú</h1><small>Ahh Plebes de la Once</small></div>
+    </div>
+    <nav class="chips" id="chips" aria-label="Categorías"></nav>
+  </header>
+  <div id="notice"></div>
+  <div class="menu" id="menu" aria-live="polite">
+    <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+  </div>
+</main>
+<div class="cartbar" id="cartbar" hidden></div>
+<dialog class="sheet" id="sheet" aria-labelledby="sheet-title"></dialog>
+<script src="../config.js"></script>
+<script type="module" src="../js/menu.js"></script>
+</body>
+</html>
