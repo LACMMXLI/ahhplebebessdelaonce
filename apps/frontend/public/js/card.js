@@ -1,4 +1,4 @@
-import { h, loadSettings, safeUrl, telHref, waHref, toast, DEFAULT_SETTINGS } from './lib.js';
+import { h, loadSettings, safeUrl, telHref, waHref, toast, linkOrSoon, DEFAULT_SETTINGS } from './lib.js';
 import { icon } from './icons.js';
 import { embers, reveal, ripples } from './fx.js';
 
@@ -46,7 +46,7 @@ function render(s) {
     ['tiktok', 'TikTok', safeUrl(s.tiktok)],
     ['instagram', 'Instagram', safeUrl(s.instagram)],
     ['youtube', 'YouTube', safeUrl(s.youtube)],
-  ].filter(([, , href]) => href); // lo que no tiene enlace no se muestra
+  ]; // todas se muestran; las que aún no tienen enlace avisan "muy pronto"
 
   const maps = safeUrl(s.maps) || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.direccion)}`;
   const [l1, l2] = s.slogan.split(/(?<=\.)\s+/);
@@ -56,9 +56,9 @@ function render(s) {
     h('p', { class: 'cats' }, 'BURGERS · BURRITOS · HOT DOGS · SNACKS'),
     h('i', { class: 'rule', 'aria-hidden': 'true' }),
     h('p', { class: 'slogan' }, l1, l2 ? [h('br'), l2] : null),
-    s.horario ? h('p', { class: 'hours' }, icon('clock'), s.horario) : null,
-    social.length ? h('nav', { class: 'tiles rv', 'aria-label': 'Redes sociales' }, social.map(([k, label, href]) =>
-      h('a', { class: `tile ${k} rp lift`, href, ...external }, icon(k), label))) : null,
+    h('p', { class: 'hours' }, icon('clock'), s.horario || 'Horario próximamente'),
+    h('nav', { class: 'tiles rv', 'aria-label': 'Redes sociales' }, social.map(([k, label, href]) =>
+      linkOrSoon(href, label, { class: `tile ${k} rp lift` }, icon(k), label))),
     h('a', { class: 'cta rp lift rv', href: 'menu/' },
       icon('burger', 'cta-ico'),
       h('span', { class: 'cta-txt' }, h('b', {}, 'Ver menú digital'),
@@ -67,8 +67,8 @@ function render(s) {
     h('div', { class: 'duo rv' },
       h('a', { class: 'pill rp lift', href: telHref(s) }, icon('phone'),
         h('span', {}, h('b', {}, 'Llamar ahora'), h('small', {}, s.telefono)), chev()),
-      wa ? h('a', { class: 'pill wa rp lift', href: wa, ...external }, icon('waline'),
-        h('span', {}, h('b', {}, 'WhatsApp'), h('small', {}, s.telefono)), chev()) : null),
+      linkOrSoon(wa, 'WhatsApp', { class: 'pill wa rp lift' }, icon('waline'),
+        h('span', {}, h('b', {}, 'WhatsApp'), h('small', {}, s.telefono)), chev())),
     h('a', { class: 'row row-map first rp lift rv', href: maps, ...external },
       h('span', { class: 'row-ico pin' }, icon('pin')),
       h('span', { class: 'row-txt' }, h('b', {}, 'Cómo llegar'), h('small', {}, s.direccion)),

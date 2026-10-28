@@ -8,7 +8,7 @@ Pensado para móvil; el panel también se usa cómodo en escritorio.
 
 | Sección | Ruta | Qué hace |
 |---|---|---|
-| **Tarjeta** | `/` | Réplica animada del diseño: logo neón, redes, menú, llamar, WhatsApp, cómo llegar, guardar contacto (.vcf) y compartir. Las redes sin enlace no se muestran. Funciona aunque el backend esté caído. |
+| **Tarjeta** | `/` | Réplica animada del diseño: logo neón, redes, menú, llamar, WhatsApp, cómo llegar, guardar contacto (.vcf) y compartir. Todos los iconos de redes se ven siempre; los que aún no tienen enlace avisan "estará disponible muy pronto" al tocarlos. Funciona aunque el backend esté caído. |
 | **Menú** | `/menu/` | Categorías, fotos, precios, "agotado", carrito con notas, pedido para llevar o comer aquí, confirmación y envío a WhatsApp. |
 | **Panel** | `/admin/` | Pedidos en vivo (aviso con sonido, estados, historial, ventas de hoy), platillos con fotos, categorías, ajustes del negocio, **código QR y enlace para el NFC**, cambio de contraseña. |
 
@@ -83,7 +83,7 @@ La imagen es la misma en cualquier entorno: `API_URL` y `SITE_URL` se aplican al
 
 ### Primer uso
 1. Entra a `https://tudominio.com/admin/` con `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
-2. **Ajustes**: confirma teléfono y WhatsApp; agrega Facebook, Instagram, TikTok cuando existan (las redes vacías no se muestran). Ahí mismo están el **enlace y el QR** de la tarjeta para grabar el NFC e imprimir.
+2. **Ajustes**: confirma teléfono y WhatsApp; agrega Facebook, Instagram, TikTok cuando existan (mientras estén vacíos, su icono se ve y avisa "muy pronto"). Ahí mismo están el **enlace y el QR** de la tarjeta para grabar el NFC e imprimir.
 3. **Platillos**: edita los de ejemplo o crea los tuyos (precio obligatorio para publicar) y sube la foto.
 4. Deja el panel abierto en el celular o la tablet del local: avisa con sonido cuando llega un pedido.
 

@@ -465,7 +465,7 @@ async function viewAjustes(pane) {
         field('Enlace de Google Maps', inp('maps', { type: 'url', placeholder: 'https://…' }))),
       field('Dirección', inp('direccion', { maxLength: 250 }))),
     h('section', { class: 'card form' }, h('h3', {}, 'Redes sociales'),
-      h('span', { class: 'help muted' }, 'Las que dejes vacías no se muestran en la tarjeta.'),
+      h('span', { class: 'help muted' }, 'Todos los iconos se ven en la tarjeta. Los que dejes vacíos avisarán "muy pronto" al tocarlos.'),
       h('div', { class: 'row2' },
         field('Facebook', inp('facebook', { type: 'url', placeholder: 'https://facebook.com/…' })),
         field('Instagram', inp('instagram', { type: 'url', placeholder: 'https://instagram.com/…' })),

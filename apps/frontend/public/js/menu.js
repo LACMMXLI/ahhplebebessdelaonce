@@ -1,4 +1,4 @@
-import { h, api, ApiError, loadSettings, money, telHref, waHref, toast } from './lib.js';
+import { h, api, ApiError, loadSettings, money, telHref, waHref, linkOrSoon } from './lib.js';
 import { icon } from './icons.js';
 import { embers, ripples, closeDialog, fly } from './fx.js';
 
@@ -65,7 +65,7 @@ function contactActions() {
   const wa = waHref(settings);
   return h('div', { class: 'actions' },
     h('a', { class: 'btn-pill rp', href: telHref(settings) }, icon('phone'), 'Llamar'),
-    wa ? h('a', { class: 'btn-pill green rp', href: wa, target: '_blank', rel: 'noopener noreferrer' }, icon('waline'), 'WhatsApp') : null);
+    linkOrSoon(wa, 'WhatsApp', { class: 'btn-pill green rp' }, icon('waline'), 'WhatsApp'));
 }
 
 function renderMenu() {

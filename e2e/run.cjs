@@ -137,9 +137,17 @@ async function apiJson(p, { method = 'GET', body, token } = {}) {
     assert.match(await page.locator('a.pill.wa').getAttribute('href'), /^https:\/\/wa\.me\/\d+/);
     assert.match(await page.locator('a.row-map').getAttribute('href'), /^https:\/\//);
     assert.equal(await page.locator('a.cta').getAttribute('href'), 'menu/');
-    for (const red of ['facebook', 'tiktok', 'instagram', 'youtube']) {
-      assert.equal(await page.locator(`.tile.${red}`).count(), s[red] ? 1 : 0, `tile ${red}`);
+    // Todos los iconos se ven aunque no tengan enlace: con enlace son <a>, sin enlace son botones con aviso.
+    for (const red of ['facebook', 'whatsapp', 'tiktok', 'instagram', 'youtube']) {
+      const tile = page.locator(`.tile.${red}`);
+      assert.equal(await tile.count(), 1, `tile ${red} visible`);
+      assert.equal(await tile.isVisible(), true);
+      assert.equal(await tile.locator('svg').isVisible(), true, `icono ${red}`);
+      const sinEnlace = red === 'whatsapp' ? !s.whatsapp : !s[red];
+      assert.equal(await tile.evaluate((e) => e.tagName), sinEnlace ? 'BUTTON' : 'A', `tag ${red}`);
+      if (sinEnlace) { await tile.click(); await page.waitForSelector('.toast.show'); assert.match(await page.locator('.toast').innerText(), /muy pronto/); }
     }
+    assert.equal(await page.locator('.hours').isVisible(), true);
     await ctx.close();
   });
   await step('guardar contacto descarga un .vcf válido', async () => {
@@ -388,7 +396,7 @@ async function apiJson(p, { method = 'GET', body, token } = {}) {
     await admin.locator('label.sw', { hasText: 'Recibir pedidos' }).click();
     await admin.click('text=Guardar ajustes');
     await admin.waitForSelector('.toast.show');
-    await page.goto(BASE + '/'); await page.waitForSelector('.tile.facebook');
+    await page.goto(BASE + '/'); await page.waitForSelector('a.tile.facebook');
     assert.equal(await page.locator('.tile.facebook').getAttribute('href'), 'https://facebook.com/ahhplebes-e2e');
     await page.goto(BASE + '/menu/'); await page.waitForSelector('.notice');
     assert.equal(await page.locator('.add').count(), 0);
