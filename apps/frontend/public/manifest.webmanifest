@@ -1,7 +1,7 @@
 {
-  "name": "Ahh Plebes de la Once",
-  "short_name": "Ahh Plebes",
-  "description": "Menú, pedidos por WhatsApp y ubicación de Ahh Plebes de la Once",
+  "name": "Los Plebes de la Once",
+  "short_name": "Los Plebes",
+  "description": "Menú, pedidos por WhatsApp y ubicación de Los Plebes de la Once",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#08090b",

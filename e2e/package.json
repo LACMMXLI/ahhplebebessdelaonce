@@ -1,0 +1,15 @@
+{
+  "name": "ahh-plebes-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pruebas de extremo a extremo (navegador real) contra un entorno ya levantado",
+  "scripts": {
+    "test": "node run.cjs"
+  },
+  "devDependencies": {
+    "axe-core": "^4.10.0",
+    "jsqr": "^1.4.0",
+    "playwright": "1.63.0",
+    "pngjs": "^7.0.0"
+  }
+}

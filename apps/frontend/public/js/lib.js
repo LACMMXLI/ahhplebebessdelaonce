@@ -58,7 +58,7 @@ export async function api(path, { method = 'GET', body, form, token, timeout = 1
 
 /* ---------- Ajustes del negocio, con respaldo si el backend no responde ---------- */
 export const DEFAULT_SETTINGS = {
-  nombre: 'Ahh Plebes de la Once',
+  nombre: 'Los Plebes de la Once',
   slogan: 'Andamos al cien mi gente bonita. Hay que pasárnosla bien.',
   telefono: '686 202 9161',
   whatsapp: '526862029161',
@@ -89,6 +89,17 @@ export const waHref = (s, text) => {
   const d = String(s.whatsapp || '').replace(/\D/g, '');
   return d ? `https://wa.me/${d}${text ? `?text=${encodeURIComponent(text)}` : ''}` : null;
 };
+
+/* ---------- Enlace que siempre se ve ----------
+   Si hay dirección es un <a>; si todavía no la hay, el icono se muestra igual como botón
+   (nunca un enlace roto) y al tocarlo avisa que pronto estará disponible. */
+export function linkOrSoon(href, label, props, ...children) {
+  if (href) return h('a', { ...props, href, target: '_blank', rel: 'noopener noreferrer' }, ...children);
+  return h('button', {
+    ...props, type: 'button', class: `${props.class} is-empty`, 'aria-label': `${label}: aún no disponible`,
+    onclick: () => toast(`${label} estará disponible muy pronto`),
+  }, ...children);
+}
 
 /* ---------- Aviso (toast) ---------- */
 let toastEl, toastTimer;

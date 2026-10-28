@@ -70,6 +70,7 @@ test('seed: menú público vacío (los ejemplos están ocultos y sin precio)', a
   assert.equal(r.status, 200);
   assert.deepEqual(r.json.categorias, []);
   const adm = await api('/api/settings');
+  assert.equal(adm.json.nombre, 'Los Plebes de la Once', 'la migración 002 actualiza el nombre');
   assert.equal(adm.json.telefono, '686 202 9161');
   assert.equal(adm.json.whatsapp, '526862029161');
   assert.equal(adm.json.facebook, '');
@@ -130,8 +131,12 @@ test('imagen: sube, se reencoda a webp, y se borra al reemplazar', async () => {
   const j = await r.json();
   assert.equal(r.status, 200);
   assert.match(j.imagen_url, /^https:\/\/files\.example\.com\/platillos\/platillos\/[0-9a-f-]+\.webp$/);
-  assert.equal(s3.puts.length, 1);
+  assert.match(j.imagen_thumb_url, /-sm\.webp$/);
+  assert.equal(s3.puts.length, 2, 'imagen grande + miniatura');
   assert.ok(s3.puts[0].size < png.length);
+  assert.ok(s3.puts[1].size < s3.puts[0].size, 'la miniatura pesa menos');
+  const menuImg = (await api('/api/menu')).json.categorias[0].platillos[0];
+  assert.equal(menuImg.imagen_thumb_url, j.imagen_thumb_url);
 
   const form2 = new FormData();
   form2.append('imagen', new Blob([Buffer.from('esto no es una imagen')], { type: 'image/png' }), 'x.png');
@@ -141,12 +146,13 @@ test('imagen: sube, se reencoda a webp, y se borra al reemplazar', async () => {
   const form3 = new FormData();
   form3.append('imagen', new Blob([png], { type: 'image/png' }), 'y.png');
   await fetch(`${base}/api/admin/platillos/${burger.platillo.id}/imagen`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form3 });
-  assert.equal(s3.puts.length, 2);
-  assert.equal(s3.dels.length, 1, 'la imagen anterior se borra');
+  assert.equal(s3.puts.length, 4);
+  assert.equal(s3.dels.length, 2, 'la imagen anterior y su miniatura se borran');
 
   const del = await api(`/api/admin/platillos/${burger.platillo.id}/imagen`, { method: 'DELETE', auth: true });
   assert.equal(del.json.imagen_url, null);
-  assert.equal(s3.dels.length, 2);
+  assert.equal(del.json.imagen_thumb_url, null);
+  assert.equal(s3.dels.length, 4);
 });
 
 test('pedidos: el precio sale de la BD, no del cliente', async () => {
@@ -172,10 +178,17 @@ test('pedidos: el precio sale de la BD, no del cliente', async () => {
   assert.equal(lista.length, 1);
   assert.equal(lista[0].items.length, 2);
   assert.equal(lista[0].estado, 'nuevo');
-  assert.equal((await api('/api/admin/pedidos/resumen', { auth: true })).json.nuevos, 1);
+  const res1 = (await api('/api/admin/pedidos/resumen', { auth: true })).json;
+  assert.equal(res1.nuevos, 1);
+  assert.equal(res1.hoy, 1);
+  assert.equal(res1.ventas_hoy, 219);
 
   const est = await api(`/api/admin/pedidos/${r.json.folio}/estado`, { method: 'PATCH', auth: true, body: { estado: 'preparando' } });
   assert.equal(est.json.estado, 'preparando');
+  const res2 = (await api('/api/admin/pedidos/resumen', { auth: true })).json;
+  assert.equal(res2.nuevos, 0);
+  assert.equal(res2.preparando, 1);
+  assert.equal(res2.activos, 1);
   assert.equal((await api(`/api/admin/pedidos/${r.json.folio}/estado`, { method: 'PATCH', auth: true, body: { estado: 'volando' } })).status, 400);
 
   // un pedido ya hecho conserva nombre y precio aunque el platillo cambie
@@ -197,6 +210,19 @@ test('pedidos: validaciones y platillos no disponibles', async () => {
     body: { categoria_id: burger.id, nombre: 'Clásica', precio: 89.5, activo: true, agotado: true } });
   assert.equal((await api('/api/orders', { method: 'POST', body: ok })).status, 409);
   assert.equal((await api('/api/menu')).json.categorias.find((c) => c.nombre === 'Burgers').platillos[0].agotado, true);
+});
+
+test('cancelar un pedido lo saca de las ventas de hoy', async () => {
+  const lista = (await api('/api/admin/pedidos?estado=activos', { auth: true })).json;
+  await api(`/api/admin/pedidos/${lista[0].id}/estado`, { method: 'PATCH', auth: true, body: { estado: 'cancelado' } });
+  const hist = (await api('/api/admin/pedidos?estado=historial', { auth: true })).json;
+  assert.equal(hist.length, 1);
+  assert.equal(hist[0].estado, 'cancelado');
+  assert.equal((await api('/api/admin/pedidos?estado=raro', { auth: true })).status, 400);
+  const r = (await api('/api/admin/pedidos/resumen', { auth: true })).json;
+  assert.equal(r.ventas_hoy, 0);
+  assert.equal(r.hoy, 0);
+  assert.equal(r.activos, 0);
 });
 
 test('ajustes: validación, persistencia y pausa de pedidos', async () => {
@@ -238,4 +264,17 @@ test('CORS: solo el origen del frontend; JSON inválido y rutas inexistentes', a
   assert.equal(malo.headers.get('access-control-allow-origin'), null);
   assert.equal((await api('/api/orders', { method: 'POST', raw: '{no json', headers: { 'Content-Type': 'application/json' } })).status, 400);
   assert.equal((await api('/api/nada')).status, 404);
+});
+
+// Va al final: agota el límite de intentos fallidos de esta IP.
+test('login: los accesos correctos no agotan el límite, los fallidos sí', async () => {
+  for (let i = 0; i < 12; i++) {
+    const ok = await api('/api/auth/login', { method: 'POST', body: { email: 'dueno@example.com', password: 'otra-contraseña-larga' } });
+    assert.equal(ok.status, 200, `intento ${i}`);
+  }
+  const sigue = await api('/api/auth/login', { method: 'POST', body: { email: 'dueno@example.com', password: 'otra-contraseña-larga' } });
+  assert.notEqual(sigue.status, 429);
+  let ultimo;
+  for (let i = 0; i < 12; i++) ultimo = await api('/api/auth/login', { method: 'POST', body: { email: 'dueno@example.com', password: 'mala' } });
+  assert.equal(ultimo.status, 429, 'tras 10 fallos se bloquea');
 });

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { query, tx } from '../db.js';
-import { imageUrl } from '../storage.js';
+import { imageUrl, thumbUrl } from '../storage.js';
 import { HttpError, parse, wrap } from '../http.js';
 
 const router = Router();
@@ -29,7 +29,7 @@ router.get('/menu', wrap(async (_req, res) => {
       ...c,
       platillos: dishes.rows
         .filter((d) => d.categoria_id === c.id)
-        .map(({ imagen_key, categoria_id, ...d }) => ({ ...d, imagen_url: imageUrl(imagen_key) })),
+        .map(({ imagen_key, categoria_id, ...d }) => ({ ...d, imagen_url: imageUrl(imagen_key), imagen_thumb_url: thumbUrl(imagen_key) })),
     }))
     .filter((c) => c.platillos.length > 0);
   res.set('Cache-Control', 'no-cache');

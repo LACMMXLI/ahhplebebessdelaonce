@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0d11">
-<title>Ahh Plebes de la Once · Tarjeta digital</title>
-<meta name="description" content="Ahh Plebes de la Once en Mexicali: burgers, burritos, hot dogs y snacks. Ve el menú, pide por WhatsApp y llega fácil.">
+<meta name="theme-color" content="#08090c">
+<title>Los Plebes de la Once · Tarjeta digital</title>
+<meta name="description" content="Los Plebes de la Once en Mexicali: burgers, burritos, hot dogs y snacks. Ve el menú, pide por WhatsApp y llega fácil.">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="es_MX">
-<meta property="og:title" content="Ahh Plebes de la Once · Tarjeta digital">
+<meta property="og:title" content="Los Plebes de la Once · Tarjeta digital">
 <meta property="og:description" content="Donde el antojo se vuelve arte. Conoce nuestro menú y cómo llegar.">
 <meta property="og:image" content="__SITE_URL__/assets/og.jpg">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
@@ -17,18 +17,31 @@
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="css/app.css">
+<link rel="preload" href="fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/logo.webp" as="image">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/card.css">
+<noscript><style>.rv{opacity:1!important;transform:none!important}.panel,.food,.logo{animation:none!important}</style></noscript>
 </head>
 <body>
-<main class="wrap">
-  <section class="hero" aria-label="Ahh Plebes de la Once">
-    <div class="food left" aria-hidden="true"></div><div class="food right" aria-hidden="true"></div><div class="glow" aria-hidden="true"></div>
-    <div class="brand"><img src="assets/logo.webp" width="330" height="330" alt="Logo de Ahh Plebes de la Once"></div>
-  </section>
-  <section class="content" id="card">
-    <h1 class="title">Ahh Plebes de la Once</h1>
-    <div class="categories">BURGERS · BURRITOS · HOT DOGS · SNACKS</div>
-    <div class="line" aria-hidden="true"></div>
+<div class="ambient" aria-hidden="true"></div>
+<canvas id="embers" aria-hidden="true"></canvas>
+<main class="stage">
+  <header class="hero" aria-label="Los Plebes de la Once">
+    <div class="food left" aria-hidden="true"></div>
+    <div class="food right" aria-hidden="true"></div>
+    <div class="lamp l" aria-hidden="true"></div><div class="lamp r" aria-hidden="true"></div>
+    <div class="stage-glow" aria-hidden="true"></div>
+    <div class="logo">
+      <div class="logo-float">
+        <i class="logo-ring" aria-hidden="true"></i><i class="logo-ring sharp" aria-hidden="true"></i>
+        <img src="assets/logo.webp" width="640" height="640" alt="Logo de Los Plebes de la Once: neón con corona, hamburguesa, papas y hot dog" fetchpriority="high">
+      </div>
+    </div>
+  </header>
+  <section class="panel" id="card" aria-label="Información y accesos">
+    <h1 class="title">Los Plebes de la Once</h1>
+    <p class="cats">BURGERS · BURRITOS · HOT DOGS · SNACKS</p>
     <noscript><p>Llámanos al <a href="tel:+526862029161">686 202 9161</a>. Prolongación H. Colegio Militar #1242, Col. Voluntad, Mexicali, B.C.</p></noscript>
   </section>
 </main>

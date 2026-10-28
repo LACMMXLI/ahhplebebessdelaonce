@@ -7,8 +7,10 @@ import { HttpError, parse, wrap } from '../http.js';
 
 const router = Router();
 
+// Solo cuentan los intentos FALLIDOS: el dueño puede entrar las veces que quiera, pero adivinar
+// contraseñas queda limitado a 10 intentos cada 15 minutos por IP.
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false,
+  windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false, skipSuccessfulRequests: true,
   message: { error: 'Demasiados intentos. Espera unos minutos.' },
 });
 
