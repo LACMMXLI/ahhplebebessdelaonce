@@ -37,7 +37,7 @@ function logout(msg) {
   token = null; lastNuevos = null;
   try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignorar */ }
   clearInterval(pollTimer);
-  document.title = 'Panel · Ahh Plebes de la Once';
+  document.title = 'Panel · Los Plebes de la Once';
   renderLogin(msg);
 }
 
@@ -124,7 +124,7 @@ function renderShell() {
   const navBtn = (k, label, ic) => h('button', { class: 'nav rp', type: 'button', dataset: { v: k }, onclick: () => go(k) },
     icon(ic), label, k === 'pedidos' ? h('span', { class: 'badge', hidden: !state.nuevos, 'aria-label': `${state.nuevos} pedidos nuevos` }, String(state.nuevos)) : null);
   const side = h('aside', { class: 'side', 'aria-label': 'Navegación' },
-    h('div', { class: 'brand' }, h('img', { src: '../assets/logo.webp', alt: '' }), h('div', {}, h('b', {}, 'Ahh Plebes'), h('small', {}, 'Panel del negocio'))),
+    h('div', { class: 'brand' }, h('img', { src: '../assets/logo.webp', alt: '' }), h('div', {}, h('b', {}, 'Los Plebes'), h('small', {}, 'Panel del negocio'))),
     ...TABS.map(([k, l, i]) => navBtn(k, l, i)),
     h('div', { class: 'sp' }),
     h('a', { class: 'nav rp', href: '../menu/', target: '_blank', rel: 'noopener' }, icon('external'), 'Ver menú'),
@@ -162,7 +162,7 @@ async function poll() {
     }
     lastNuevos = r.nuevos;
     if (state.nuevos !== r.nuevos) { state.nuevos = r.nuevos; state.drawNav?.(); }
-    document.title = `${r.nuevos ? `(${r.nuevos}) ` : ''}Panel · Ahh Plebes de la Once`;
+    document.title = `${r.nuevos ? `(${r.nuevos}) ` : ''}Panel · Los Plebes de la Once`;
   } catch { /* se reintenta en el siguiente ciclo */ }
 }
 
@@ -420,7 +420,7 @@ function qrCard() {
     const c = document.createElement('canvas'); c.width = c.height = px;
     const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, px, px); g.fillStyle = '#000';
     for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) if (qr.isDark(r, col)) g.fillRect((col + margin) * cell, (r + margin) * cell, cell, cell);
-    c.toBlob((b) => b && download(b, 'qr-ahh-plebes.png'), 'image/png');
+    c.toBlob((b) => b && download(b, 'qr-los-plebes.png'), 'image/png');
   };
   return h('section', { class: 'card qr-card' },
     holder,
@@ -433,7 +433,7 @@ function qrCard() {
           try { await navigator.clipboard.writeText(url); toast('Enlace copiado ✓'); } catch { toast(url); }
         } }, 'Copiar enlace'),
         h('button', { class: 'btn sm rp', type: 'button', onclick: png }, 'Descargar QR (PNG)'),
-        h('button', { class: 'btn sm rp', type: 'button', onclick: () => download(new Blob([svg], { type: 'image/svg+xml' }), 'qr-ahh-plebes.svg') }, 'Descargar (SVG)'))));
+        h('button', { class: 'btn sm rp', type: 'button', onclick: () => download(new Blob([svg], { type: 'image/svg+xml' }), 'qr-los-plebes.svg') }, 'Descargar (SVG)'))));
 }
 
 /* ---------- Ajustes ---------- */

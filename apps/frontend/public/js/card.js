@@ -17,7 +17,7 @@ function vcard(s) {
   }
   rows.push('END:VCARD');
   const blob = new Blob([`${rows.join('\r\n')}\r\n`], { type: 'text/vcard;charset=utf-8' });
-  const a = h('a', { href: URL.createObjectURL(blob), download: 'Ahh-Plebes-de-la-Once.vcf' });
+  const a = h('a', { href: URL.createObjectURL(blob), download: 'Los-Plebes-de-la-Once.vcf' });
   document.body.append(a);
   a.click();
   a.remove();

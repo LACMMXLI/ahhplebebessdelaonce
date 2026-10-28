@@ -177,7 +177,7 @@ async function apiJson(p, { method = 'GET', body, token } = {}) {
     const errors = watch(page, 'tarjeta sin api', [/ERR_FAILED|Failed to load resource/]);
     await page.goto(BASE + '/'); await page.waitForSelector('.cta');
     assert.ok(await page.locator('a.pill').count());
-    assert.match(await page.locator('.title').innerText(), /Plebes/);
+    assert.match(await page.locator('.title').innerText(), /Los Plebes de la Once/);
     assert.deepEqual(errors, []);
     await ctx.close();
   });

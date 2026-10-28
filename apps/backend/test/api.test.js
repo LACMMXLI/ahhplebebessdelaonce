@@ -70,6 +70,7 @@ test('seed: menú público vacío (los ejemplos están ocultos y sin precio)', a
   assert.equal(r.status, 200);
   assert.deepEqual(r.json.categorias, []);
   const adm = await api('/api/settings');
+  assert.equal(adm.json.nombre, 'Los Plebes de la Once', 'la migración 002 actualiza el nombre');
   assert.equal(adm.json.telefono, '686 202 9161');
   assert.equal(adm.json.whatsapp, '526862029161');
   assert.equal(adm.json.facebook, '');

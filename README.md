@@ -1,4 +1,4 @@
-# Ahh Plebes de la Once — tarjeta digital, menú y pedidos
+# Los Plebes de la Once — tarjeta digital, menú y pedidos
 
 Tarjeta NFC/QR con el diseño del negocio, menú digital con carrito (el pedido sale por WhatsApp) y un
 panel para que el dueño administre **pedidos, platillos, categorías y datos del negocio**.
