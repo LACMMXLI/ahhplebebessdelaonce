@@ -175,7 +175,7 @@ const ajustesSchema = z.object({
   telefono: z.string().trim().max(25),
   whatsapp: z.string().trim().max(20).refine((v) => v === '' || /^\d{10,15}$/.test(v), 'Solo dígitos con lada, ej. 526862029161'),
   direccion: z.string().trim().max(250),
-  maps: url, facebook: url, tiktok: url, instagram: url, youtube: url,
+  maps: url, facebook: url, tiktok: url, instagram: url, youtube: url, google_reviews: url,
   horario: z.string().trim().max(300),
   pedidos_activos: z.boolean(),
 }).partial();

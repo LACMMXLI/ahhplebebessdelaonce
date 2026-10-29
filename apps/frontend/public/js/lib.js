@@ -66,6 +66,7 @@ export const DEFAULT_SETTINGS = {
   maps: 'https://www.google.com/maps/search/?api=1&query=Prolongaci%C3%B3n%20H%20Colegio%20Militar%201242%20Colonia%20Voluntad%20Mexicali%20Baja%20California',
   facebook: '', tiktok: '', instagram: '',
   youtube: 'https://www.youtube.com/@michingontb3',
+  google_reviews: '',
   horario: '',
   pedidos_activos: true,
 };

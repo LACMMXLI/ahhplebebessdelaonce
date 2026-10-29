@@ -50,14 +50,9 @@
 .is-empty{cursor:pointer}
 .tile.is-empty .ico{opacity:.85}
 .tile{flex:1 1 56px;min-width:0;max-width:112px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:82px;padding:12px 2px 10px;border-radius:18px;font-size:clamp(10.5px,3vw,12.5px);font-weight:600;
-  background:linear-gradient(160deg,rgba(24,29,38,.96),rgba(8,10,14,.96));border:1.5px solid rgba(255,255,255,.16)}
+  background:linear-gradient(160deg,rgba(24,29,38,.96),rgba(8,10,14,.96));border:none;box-shadow:0 4px 14px rgba(0,0,0,.35)}
 .tile .ico{width:clamp(30px,9vw,36px);height:clamp(30px,9vw,36px);transition:transform .4s var(--spring)}
 @media(hover:hover){.tile:hover .ico{transform:scale(1.18) rotate(-6deg)}}
-.tile.facebook{border-color:rgba(47,132,255,.55);box-shadow:0 0 16px rgba(47,132,255,.2)}
-.tile.whatsapp{border-color:rgba(37,211,102,.7);background:linear-gradient(160deg,rgba(14,60,32,.9),rgba(8,26,16,.96));box-shadow:0 0 18px rgba(37,211,102,.3)}
-.tile.tiktok{border-color:rgba(255,255,255,.2)}
-.tile.instagram{border-color:rgba(225,48,108,.55);box-shadow:0 0 16px rgba(225,48,108,.18)}
-.tile.youtube{border-color:rgba(255,40,40,.55);box-shadow:0 0 16px rgba(255,40,40,.2)}
 
 /* ----- Botón del menú ----- */
 .cta{position:relative;display:flex;align-items:center;gap:14px;width:100%;min-height:88px;padding:14px 16px;border-radius:22px;text-align:left;overflow:hidden;isolation:isolate;
@@ -76,14 +71,15 @@
 .chev .ico{width:1em;height:1em}
 @media(hover:hover){a:hover>.chev,button:hover>.chev{transform:translateX(5px)}}
 
-/* ----- Llamar / WhatsApp ----- */
+/* ----- Llamar / Google Reseñas ----- */
 .duo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .pill{display:flex;align-items:center;gap:10px;min-height:76px;padding:10px 12px;border-radius:19px;text-align:left;min-width:0;
   border:2px solid #20e35c;background:linear-gradient(135deg,#0a5a29,#0b8a3b 55%,#06622a);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 0 16px rgba(32,227,92,.38)}
-.pill.wa{background:linear-gradient(135deg,#10c63c,#07a933 60%,#058b2a);border-color:#59ff68;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 0 22px rgba(60,255,90,.55)}
+.pill.google{background:linear-gradient(135deg,#1e2430,#141822 65%,#0d1017);border-color:rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 0 18px rgba(66,133,244,.25)}
 .pill>.ico{width:30px;height:30px;color:#fff;filter:drop-shadow(0 0 5px rgba(255,255,255,.6))}
-.pill.wa>.ico{width:34px;height:34px}
+.pill.google>.ico{width:32px;height:32px;filter:drop-shadow(0 0 4px rgba(255,255,255,.4))}
+.pill.google small{color:#fbbc05}
 .pill span{display:block;min-width:0}
 .pill b{display:block;font-weight:800;font-size:clamp(13px,3.7vw,17px);line-height:1.15}
 .pill small{display:block;margin-top:3px;font-weight:800;font-size:clamp(12.5px,3.5vw,16px);white-space:nowrap;letter-spacing:.01em}
