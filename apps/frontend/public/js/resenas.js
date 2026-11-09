@@ -14,12 +14,9 @@ const miniStars = (n) => h('div', { class: 'mini-stars', role: 'img', 'aria-labe
 
 const checkIcon = () => icon('check');
 
-function confetti() {
-  if (prefersReducedMotion) return null;
-  const colors = ['#ffc83a', '#ff4a4a', '#2f8cff', '#1ee05a', '#ff6ee8', '#ff8a1f'];
-  return h('div', { class: 'confetti', 'aria-hidden': 'true' }, Array.from({ length: 26 }, (_, i) =>
-    h('i', { style: `left:${Math.round((i / 26) * 100 + Math.random() * 3)}%;background:${colors[i % colors.length]};--d:${(2.2 + Math.random() * 1.6).toFixed(2)}s;--w:${(Math.random() * 0.5).toFixed(2)}s;--x:${Math.round(-40 + Math.random() * 80)}px;--r:${Math.round(360 + Math.random() * 540)}deg` })));
-}
+const header = () => h('div', { class: 'g-head' },
+  h('img', { src: '../assets/logo.webp', width: 44, height: 44, alt: '' }),
+  h('div', {}, h('b', {}, settings.nombre), h('small', {}, 'Tu opinión nos ayuda a mejorar')));
 
 /* ---------- 1. Elegir estrellas ---------- */
 function showRate(preset = 0) {
@@ -44,10 +41,10 @@ function showRate(preset = 0) {
   }, icon('star'))));
 
   root.replaceChildren(
-    h('h1', {}, '¿Cómo estuvo tu experiencia?'),
-    h('p', { class: 'r-sub' }, `Cuéntanos qué tal te fue en ${settings.nombre}.`),
-    row, mood,
-    h('p', { class: 'hint' }, 'Toca las estrellas para calificar'));
+    header(),
+    h('h1', {}, '¿Cómo calificarías tu experiencia?'),
+    h('p', { class: 'r-sub' }, 'Selecciona de 1 a 5 estrellas.'),
+    row, mood);
   paint(preset, false);
 }
 
@@ -66,16 +63,15 @@ async function sendHigh(n) {
 
 function showThanksHigh(n, url) {
   const nodes = [
-    confetti(),
-    h('div', { class: 'bigcheck gold' }, icon('star')),
+    header(),
     miniStars(n),
     h('h2', {}, '¡Gracias por tu calificación!'),
     url
-      ? h('p', { class: 'r-sub' }, 'Nos encantaría que compartas tu opinión en Google: ayuda muchísimo a que más personas nos conozcan.')
+      ? h('p', { class: 'r-sub' }, 'Para publicar tu reseña te llevamos a Google, donde podrás escribirla con tu cuenta.')
       : h('p', { class: 'r-sub' }, 'Nos alegra mucho que la hayas pasado bien. ¡Te esperamos pronto!'),
-    url ? h('a', { class: 'r-btn green rp', href: url }, icon('star'), 'Opinar en Google') : null,
+    url ? h('a', { class: 'r-btn green wide rp', href: url }, 'Continuar a Google') : null,
     url ? h('p', { class: 'redir' }, h('span', { class: 'spin', 'aria-hidden': 'true' }), 'Te llevamos a Google…') : null,
-    h('div', { class: 'stack' }, h('a', { class: 'r-btn ghost rp', href: '../' }, 'Volver al inicio')),
+    h('div', { class: 'stack' }, h('a', { class: 'r-btn ghost wide rp', href: '../' }, 'Volver al inicio')),
   ].filter(Boolean);
   root.replaceChildren(...nodes);
   if (url) redirectTimer = setTimeout(() => { location.href = url; }, 2200);
@@ -84,20 +80,20 @@ function showThanksHigh(n, url) {
 /* ---------- 2b. 1-3 estrellas: retroalimentación interna ---------- */
 function showForm(n) {
   const err = h('p', { class: 'err', role: 'alert', hidden: true });
-  const area = h('textarea', { id: 'f-msg', name: 'comentario', maxLength: 1000, rows: 5, placeholder: 'Cuéntanos qué pasó y cómo podemos mejorar…' });
+  const area = h('textarea', { id: 'f-msg', name: 'comentario', maxLength: 1000, rows: 5, placeholder: 'Comparte detalles de tu experiencia…' });
   const counter = h('div', { class: 'count' }, '0 / 1000');
   area.addEventListener('input', () => { counter.textContent = `${area.value.length} / 1000`; });
-  const btn = h('button', { class: 'r-btn rp', type: 'submit' }, 'Enviar comentarios');
+  const btn = h('button', { class: 'r-btn rp', type: 'submit' }, 'Enviar');
   const form = h('form', { class: 'fb', onsubmit: async (e) => {
     e.preventDefault();
     err.hidden = true; btn.disabled = true; btn.replaceChildren(h('span', { class: 'spin', 'aria-hidden': 'true' }), 'Enviando…');
     const fd = new FormData(form);
     try {
-      const r = await api('/api/reviews', { method: 'POST', body: {
+      await api('/api/reviews', { method: 'POST', body: {
         calificacion: n, comentario: fd.get('comentario'), nombre: fd.get('nombre'), contacto: fd.get('contacto'), pedido } });
-      showThanksLow(n);
+      showThanksLow();
     } catch (ex) {
-      err.textContent = ex.message; err.hidden = false; btn.disabled = false; btn.textContent = 'Enviar comentarios';
+      err.textContent = ex.message; err.hidden = false; btn.disabled = false; btn.textContent = 'Enviar';
     }
   } },
     h('div', { class: 'fld' }, h('label', { for: 'f-msg' }, 'Tu mensaje'), area, counter),
@@ -105,31 +101,36 @@ function showForm(n) {
       h('input', { id: 'f-nom', name: 'nombre', maxLength: 60, autocomplete: 'name' })),
     h('div', { class: 'fld' }, h('label', { for: 'f-con' }, 'Teléfono o correo, si quieres que te contactemos (opcional)'),
       h('input', { id: 'f-con', name: 'contacto', maxLength: 60, autocomplete: 'tel' })),
-    err, btn,
-    h('button', { class: 'r-btn ghost rp', type: 'button', onclick: () => showRate(0) }, 'Cambiar calificación'));
+    h('p', { class: 'note' }, 'Tu mensaje se envía directamente al negocio como retroalimentación. No se publica en Google.'),
+    err,
+    h('div', { class: 'acts' },
+      h('button', { class: 'r-btn ghost rp', type: 'button', onclick: () => showRate(0) }, 'Cancelar'), btn));
   root.replaceChildren(
+    header(),
     miniStars(n),
     h('h2', {}, 'Lamentamos que no haya sido perfecta'),
-    h('p', { class: 'r-sub' }, 'Tu opinión nos importa y la vamos a leer. ¿Qué podemos mejorar?'),
+    h('p', { class: 'r-sub' }, 'Cuéntanos qué pasó y cómo podemos mejorar.'),
     form);
   area.focus({ preventScroll: true });
 }
 
 function showThanksLow() {
   root.replaceChildren(
+    header(),
     h('div', { class: 'bigcheck' }, checkIcon()),
     h('h2', {}, 'Gracias por tu honestidad'),
     h('p', { class: 'r-sub' }, 'Recibimos tus comentarios y los vamos a revisar para mejorar. Esperamos verte de nuevo pronto.'),
-    h('div', { class: 'stack' }, h('a', { class: 'r-btn ghost rp', href: '../' }, 'Volver al inicio')));
+    h('div', { class: 'stack' }, h('a', { class: 'r-btn ghost wide rp', href: '../' }, 'Volver al inicio')));
 }
 
 function showError(e, retry, back) {
   root.replaceChildren(
+    header(),
     h('h2', {}, 'No pudimos registrar tu opinión'),
     h('p', { class: 'r-sub' }, e instanceof ApiError ? e.message : 'Inténtalo de nuevo en un momento.'),
     h('div', { class: 'stack' },
-      h('button', { class: 'r-btn rp', type: 'button', onclick: retry }, 'Reintentar'),
-      h('button', { class: 'r-btn ghost rp', type: 'button', onclick: back }, 'Volver')));
+      h('button', { class: 'r-btn wide rp', type: 'button', onclick: retry }, 'Reintentar'),
+      h('button', { class: 'r-btn ghost wide rp', type: 'button', onclick: back }, 'Volver')));
 }
 
 embers(); ripples();
