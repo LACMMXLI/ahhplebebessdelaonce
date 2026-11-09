@@ -25,6 +25,7 @@ Object.assign(process.env, {
   S3_ENDPOINT: `http://127.0.0.1:${s3Server.address().port}`,
   S3_ACCESS_KEY: 'k', S3_SECRET_KEY: 's', S3_BUCKET: 'platillos',
   S3_PUBLIC_URL: 'https://files.example.com',
+  RATE_LIMIT_REVIEWS: '1000',
 });
 
 const { pool, migrate, query } = await import('../src/db.js');
@@ -264,6 +265,100 @@ test('CORS: solo el origen del frontend; JSON inválido y rutas inexistentes', a
   assert.equal(malo.headers.get('access-control-allow-origin'), null);
   assert.equal((await api('/api/orders', { method: 'POST', raw: '{no json', headers: { 'Content-Type': 'application/json' } })).status, 400);
   assert.equal((await api('/api/nada')).status, 404);
+});
+
+test('reseñas: 4-5★ van a Google, 1-3★ quedan como retroalimentación interna', async () => {
+  const post = (body) => api('/api/reviews', { method: 'POST', body });
+  const put = (body) => api('/api/admin/ajustes', { method: 'PUT', auth: true, body });
+  const ID = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
+
+  // Sin ID de Google configurado no se inventa ningún enlace
+  const a = await post({ calificacion: 5 });
+  assert.equal(a.status, 201);
+  assert.equal(a.json.destino, 'google');
+  assert.equal(a.json.url, null);
+
+  assert.equal((await put({ google_place_id: 'corto' })).status, 400);
+  assert.equal((await put({ google_place_id: 'https://google.com/maps' })).status, 400);
+  assert.equal((await put({ google_place_id: ID })).status, 200);
+
+  const b = await post({ calificacion: 4 });
+  assert.equal(b.json.destino, 'google');
+  assert.equal(b.json.url, `https://search.google.com/local/writereview?placeid=${ID}`);
+
+  // Calificación baja: queda guardada con su mensaje y NO se envía a Google
+  const c = await post({ calificacion: 2, comentario: 'Tardó mucho en llegar', nombre: 'Luis', contacto: '686 111 2222' });
+  assert.equal(c.status, 201);
+  assert.equal(c.json.destino, 'interno');
+  assert.equal(c.json.url, null, 'las calificaciones bajas nunca reciben el enlace de Google');
+  const d = await post({ calificacion: 3, comentario: 'Regular' });
+  assert.equal(d.json.url, null);
+
+  // Las altas no guardan texto ni datos personales
+  const e = await post({ calificacion: 5, comentario: 'Excelente', nombre: 'Ana', contacto: '123' });
+  assert.equal(e.json.destino, 'google');
+  const hist = (await api('/api/admin/resenas?tipo=google', { auth: true })).json;
+  assert.equal(hist.length, 3);
+  assert.ok(hist.every((r) => r.comentario === '' && r.nombre === '' && r.contacto === ''));
+
+  // Validaciones
+  for (const bad of [{ calificacion: 0 }, { calificacion: 6 }, { calificacion: 3.5 }, { calificacion: '5' }, {}, { calificacion: 2, comentario: 'x'.repeat(1001) }]) {
+    assert.equal((await post(bad)).status, 400, JSON.stringify(bad).slice(0, 40));
+  }
+
+  // El ID de Google no se expone en la API pública
+  const pub = (await api('/api/settings')).json;
+  assert.equal('google_place_id' in pub, false);
+  const adm = (await api('/api/admin/ajustes', { auth: true })).json;
+  assert.equal(adm.google_place_id, ID);
+
+  // Vincular con un pedido existente; uno inexistente se ignora sin fallar
+  const pedido = (await api('/api/admin/pedidos?limit=1', { auth: true })).json[0];
+  const f = await post({ calificacion: 1, comentario: 'Mal servicio', pedido: pedido.id });
+  const g = await post({ calificacion: 1, comentario: 'Pedido inexistente', pedido: 999999 });
+  assert.equal(g.status, 201);
+
+  // Métricas: 5,4,2,3,5,1,1 -> 7 reseñas
+  const m = (await api('/api/admin/resenas/resumen', { auth: true })).json;
+  assert.equal(m.total, 7);
+  assert.equal(m.promedio, 3);
+  assert.equal(m.google, 3);
+  assert.equal(m.internas, 4);
+  assert.equal(m.pendientes, 4);
+  assert.deepEqual(m.distribucion, { 1: 2, 2: 1, 3: 1, 4: 1, 5: 2 });
+  assert.equal(m.tendencia.length, 14);
+  assert.match(m.tendencia.at(-1).dia, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(m.tendencia.at(-1).total, 7);
+  assert.equal(m.tendencia.at(-1).internas, 4);
+  assert.equal(m.google_configurado, true);
+  assert.equal(m.enlace_google, `https://search.google.com/local/writereview?placeid=${ID}`);
+
+  // Listas y gestión
+  const pend = (await api('/api/admin/resenas?tipo=pendientes', { auth: true })).json;
+  assert.equal(pend.length, 4);
+  assert.ok(pend.every((r) => r.destino === 'interno' && r.estado === 'nuevo'));
+  assert.equal(pend[0].comentario, 'Pedido inexistente', 'más recientes primero');
+  const conPedido = pend.find((r) => r.id === f.json.id);
+  assert.equal(conPedido.pedido_id, pedido.id);
+  assert.equal(conPedido.pedido_cliente, pedido.cliente_nombre);
+  const luis = pend.find((r) => r.nombre === 'Luis');
+  assert.equal(luis.comentario, 'Tardó mucho en llegar');
+  assert.equal(luis.contacto, '686 111 2222');
+
+  const ok = await api(`/api/admin/resenas/${luis.id}/estado`, { method: 'PATCH', auth: true, body: { estado: 'atendida' } });
+  assert.equal(ok.json.estado, 'atendida');
+  assert.equal((await api('/api/admin/resenas?tipo=pendientes', { auth: true })).json.length, 3);
+  assert.equal((await api('/api/admin/resenas?tipo=internas', { auth: true })).json.length, 4);
+  assert.equal((await api('/api/admin/resenas?tipo=todas', { auth: true })).json.length, 7);
+  assert.equal((await api('/api/admin/resenas?tipo=raro', { auth: true })).status, 400);
+  assert.equal((await api(`/api/admin/resenas/${luis.id}/estado`, { method: 'PATCH', auth: true, body: { estado: 'volando' } })).status, 400);
+  assert.equal((await api(`/api/admin/resenas/${hist[0].id}/estado`, { method: 'PATCH', auth: true, body: { estado: 'nuevo' } })).status, 404, 'las de Google no se gestionan');
+
+  assert.equal((await api(`/api/admin/resenas/${g.json.id}`, { method: 'DELETE', auth: true })).status, 204);
+  assert.equal((await api(`/api/admin/resenas/${g.json.id}`, { method: 'DELETE', auth: true })).status, 404);
+
+  // Todo lo administrativo exige sesión
+  for (const p of ['/api/admin/resenas', '/api/admin/resenas/resumen']) assert.equal((await api(p)).status, 401, p);
 });
 
 // Va al final: agota el límite de intentos fallidos de esta IP.

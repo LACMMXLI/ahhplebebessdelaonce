@@ -92,7 +92,7 @@ async function apiJson(p, { method = 'GET', body, token } = {}) {
   const VIEWPORTS = [[360, 640, 'móvil chico'], [390, 844, 'móvil'], [768, 1024, 'tableta'], [1280, 800, 'escritorio']];
   console.log('\n▶ Páginas por tamaño de pantalla (sin errores, sin desborde, accesibilidad)');
   for (const [w, h, label] of VIEWPORTS) {
-    for (const [route, name] of [['/', 'tarjeta'], ['/menu/', 'menú'], ['/admin/', 'login admin']]) {
+    for (const [route, name] of [['/', 'tarjeta'], ['/menu/', 'menú'], ['/resenas/', 'reseñas'], ['/admin/', 'login admin']]) {
       await step(`${name} · ${label} ${w}×${h}`, async () => {
         const ctx = await browser.newContext(ctxOpts(w, h));
         const page = await ctx.newPage();
@@ -312,7 +312,7 @@ async function apiJson(p, { method = 'GET', body, token } = {}) {
     await page.waitForSelector('.done');
     assert.match(await page.locator('.folio').innerText(), /Folio #\d+ · \$235\.50/);
     await shot(page, 'menu-confirmacion-390');
-    const href = await page.locator('.done a.btn-pill').getAttribute('href');
+    const href = await page.locator('.done a.btn-pill.green').getAttribute('href');
     assert.match(href, /^https:\/\/wa\.me\/\d+\?text=/);
     const text = decodeURIComponent(href.split('text=')[1]);
     assert.match(text, /Ana/); assert.match(text, new RegExp(`2 x ${dishName}`)); assert.match(text, /sin cebolla/);
@@ -412,14 +412,16 @@ async function apiJson(p, { method = 'GET', body, token } = {}) {
     await p.click('button[type=submit]'); await p.waitForSelector('.pane');
     await p.locator('.nav[data-v=ajustes]').locator('visible=true').first().click();
     await p.waitForSelector('.qr svg');
-    assert.equal((await p.locator('.url').innerText()).trim(), `${BASE}/`);
+    assert.equal((await p.locator('[data-qr=tarjeta] .url').innerText()).trim(), `${BASE}/`);
     await shot(p, 'admin-qr-1280');
-    const [dl] = await Promise.all([p.waitForEvent('download'), p.click('text=Descargar QR (PNG)')]);
-    const png = PNG.sync.read(fs.readFileSync(await dl.path()));
-    const code = jsQR(new Uint8ClampedArray(png.data), png.width, png.height);
-    assert.ok(code, 'el QR se puede leer');
-    assert.equal(code.data, `${BASE}/`);
-    const [dl2] = await Promise.all([p.waitForEvent('download'), p.click('text=Descargar (SVG)')]);
+    for (const [key, destino] of [['tarjeta', `${BASE}/`]]) {
+      const [dl] = await Promise.all([p.waitForEvent('download'), p.click(`[data-qr=${key}] >> text=Descargar QR (PNG)`)]);
+      const png = PNG.sync.read(fs.readFileSync(await dl.path()));
+      const code = jsQR(new Uint8ClampedArray(png.data), png.width, png.height);
+      assert.ok(code, `el QR ${key} se puede leer`);
+      assert.equal(code.data, destino);
+    }
+    const [dl2] = await Promise.all([p.waitForEvent('download'), p.click('[data-qr=tarjeta] >> text=Descargar (SVG)')]);
     assert.match(fs.readFileSync(await dl2.path(), 'utf8'), /<svg/);
     await c.close();
   });
@@ -434,6 +436,143 @@ async function apiJson(p, { method = 'GET', body, token } = {}) {
     assert.deepEqual(e2, []);
     await c2.close();
   });
+
+
+  /* ================= Reseñas ================= */
+  console.log('\n▶ Reseñas: 4-5★ a Google, 1-3★ retroalimentación');
+  const PLACE = 'ChIJe2eTestPlaceId01';
+  const googleUrl = `https://search.google.com/local/writereview?placeid=${PLACE}`;
+  const creadas = [];                       // ids de reseñas creadas por esta prueba (para borrarlas al final)
+  const rvCtx = await browser.newContext(ctxOpts(390, 844));
+  const rv = await rvCtx.newPage();
+  const rvErrors = watch(rv, 'reseñas');
+  let googleReq = null;
+  await rvCtx.route('https://search.google.com/**', (r) => { googleReq = r.request().url(); r.fulfill({ status: 200, contentType: 'text/html', body: 'google' }); });
+  rv.on('response', async (r) => {
+    if (r.url().endsWith('/api/reviews') && r.request().method() === 'POST' && r.status() === 201) { try { creadas.push((await r.json()).id); } catch { /* sin cuerpo */ } }
+  });
+  const nuevaApi = async (body) => { const r = await apiJson('/api/reviews', { method: 'POST', body }); if (r.json?.id) creadas.push(r.json.id); return r; };
+
+  await step('Ajustes: el ID de Google se valida, se guarda y habilita el enlace de prueba', async () => {
+    await visibleNav('ajustes').click();
+    await admin.waitForSelector('input[name=google_place_id]');
+    await admin.fill('input[name=google_place_id]', 'corto');
+    assert.equal(await admin.locator('a:has-text("Probar el enlace de reseña")').isVisible(), false);
+    const guardar = (estado) => Promise.all([
+      admin.waitForResponse((r) => r.url().endsWith('/api/admin/ajustes') && r.request().method() === 'PUT' && r.status() === estado),
+      admin.click('text=Guardar ajustes'),
+    ]);
+    await guardar(400);
+    await admin.waitForSelector('.err:not([hidden])');
+    assert.match(await admin.locator('.err:not([hidden])').first().innerText(), /ID de lugar de Google/);
+    await admin.fill('input[name=google_place_id]', PLACE);
+    const probar = admin.locator('a:has-text("Probar el enlace de reseña")');
+    assert.equal(await probar.getAttribute('href'), googleUrl);
+    await guardar(200);
+    assert.equal((await apiJson('/api/admin/ajustes', { token })).json.google_place_id, PLACE);
+    assert.equal('google_place_id' in (await apiJson('/api/settings')).json, false, 'el ID no se expone en la API pública');
+  });
+  await step('Ajustes y Reseñas no desbordan en pantallas de 360 px', async () => {
+    const c = await browser.newContext(ctxOpts(360, 740));
+    const p = await c.newPage();
+    await p.addInitScript((t) => sessionStorage.setItem('plebes_admin_token', t), token);
+    await p.goto(BASE + '/admin/'); await p.waitForSelector('.pane');
+    for (const v of ['ajustes', 'resenas', 'platillos', 'categorias', 'cuenta', 'pedidos']) {
+      await p.locator(`.nav[data-v=${v}]`).locator('visible=true').first().click();
+      await p.waitForTimeout(700);
+      await noOverflow(p, `admin ${v} 360px`);
+    }
+    const nav = await p.locator('.bottom').boundingBox();
+    assert.ok(nav.width <= 360 + 1, 'la barra inferior cabe');
+    await c.close();
+  });
+  await step('1-3★: pide el mensaje, lo guarda y NO manda a Google', async () => {
+    await rv.goto(BASE + '/resenas/'); await rv.waitForSelector('.star');
+    assert.equal(await rv.locator('.star').count(), 5);
+    await shot(rv, 'resenas-estrellas-390');
+    await axeCheck(rv, 'reseñas: estrellas');
+    await rv.locator('.star').nth(1).click();
+    await rv.waitForSelector('textarea');
+    assert.equal(await rv.locator('a[href*="google"]').count(), 0);
+    await rv.fill('textarea', `Tardó mucho ${RUN}`);
+    await rv.fill('input[name=nombre]', 'Cliente Prueba');
+    await rv.fill('input[name=contacto]', '686 123 0000');
+    await axeCheck(rv, 'reseñas: formulario');
+    await shot(rv, 'resenas-formulario-390');
+    await rv.click('button[type=submit]');
+    await rv.waitForSelector('.bigcheck');
+    assert.match(await rv.locator('h2').innerText(), /Gracias por tu honestidad/);
+    assert.equal(await rv.locator('.r-link').count(), 0, 'sin enlace a Google (ajuste apagado)');
+    await shot(rv, 'resenas-gracias-bajas-390');
+  });
+  await step('4-5★: registra la calificación y redirige al enlace de Google con el ID del negocio', async () => {
+    googleReq = null;
+    await rv.goto(BASE + '/resenas/'); await rv.waitForSelector('.star');
+    await rv.locator('.star').nth(4).click();
+    await rv.waitForSelector('.bigcheck.gold');
+    assert.equal(await rv.locator('a.r-btn.green').getAttribute('href'), googleUrl);
+    await shot(rv, 'resenas-gracias-altas-390');
+    for (let i = 0; i < 60 && !googleReq; i++) await rv.waitForTimeout(100);
+    assert.equal(googleReq, googleUrl, 'redirige solo a Google');
+  });
+  await step('4★ también va a Google; sin ID configurado no se inventa ningún enlace', async () => {
+    const r4 = await nuevaApi({ calificacion: 4 });
+    assert.equal(r4.json.url, googleUrl);
+    await apiJson('/api/admin/ajustes', { method: 'PUT', token, body: { google_place_id: '' } });
+    const sinId = await nuevaApi({ calificacion: 5 });
+    assert.equal(sinId.json.url, null);
+    await apiJson('/api/admin/ajustes', { method: 'PUT', token, body: { google_place_id: PLACE } });
+    await rv.goto(BASE + '/resenas/'); await rv.waitForSelector('.star');
+  });
+  await step('validación: calificaciones inválidas se rechazan', async () => {
+    for (const bad of [{ calificacion: 0 }, { calificacion: 6 }, { calificacion: 2.5 }, {}]) {
+      assert.equal((await apiJson('/api/reviews', { method: 'POST', body: bad })).status, 400, JSON.stringify(bad));
+    }
+  });
+
+  await step('panel: Reseñas muestra métricas, distribución y los mensajes con fecha y contacto', async () => {
+    const m = (await apiJson('/api/admin/resenas/resumen', { token })).json;
+    await visibleNav('resenas').click();
+    await admin.waitForSelector('.rev, .empty');
+    await admin.waitForSelector('.stat');
+    assert.match(await admin.locator('.stats').innerText(), new RegExp(`${m.total} en total`));
+    assert.equal(await admin.locator('.dist-row').count(), 5);
+    assert.equal(await admin.locator('.tcol').count(), 14);
+    assert.ok(await admin.locator('.badge.amber:not([hidden])').locator('visible=true').count(), 'insignia de pendientes en la navegación');
+    const card = admin.locator('.rev', { hasText: `Tardó mucho ${RUN}` });
+    await card.waitFor();
+    const txt = await card.innerText();
+    assert.match(txt, /Cliente Prueba/); assert.match(txt, /por atender/i); assert.match(txt, /\b20\d\d\b/, 'muestra la fecha');
+    assert.equal(await card.locator('a[href^="tel:"]').count(), 1);
+    assert.match(await card.locator('a[href^="https://wa.me/"]').getAttribute('href'), /wa\.me\/526861230000$/);
+    assert.equal(await card.locator('.rstars svg:not(.off)').count(), 2, '2 estrellas llenas');
+    await shot(admin, 'admin-resenas-390');
+    await axeCheck(admin, 'admin reseñas');
+  });
+  await step('panel: marcar atendida la saca de "Por atender" y la deja en el historial interno', async () => {
+    const card = admin.locator('.rev', { hasText: `Tardó mucho ${RUN}` });
+    await card.locator('text=Marcar atendida').click();
+    await admin.waitForSelector(`.rev:has-text("Tardó mucho ${RUN}")`, { state: 'detached' });
+    await admin.click('.stab:has-text("Retroalimentación")');
+    await admin.waitForSelector(`.rev:has-text("Tardó mucho ${RUN}") .chip-s.listo`);
+    await admin.click('.stab:has-text("Enviadas a Google")');
+    await admin.waitForSelector('.rev.goog');
+    assert.equal(await admin.locator('.rev.goog blockquote').count(), 0, 'las de Google no guardan mensajes');
+  });
+  await step('panel: una reseña nueva aparece sola con aviso, sin recargar', async () => {
+    await admin.click('.stab:has-text("Por atender")');
+    await nuevaApi({ calificacion: 1, comentario: `Auto ${RUN}` });
+    await admin.waitForSelector(`.rev:has-text("Auto ${RUN}")`, { timeout: 16000 });
+  });
+  await step('panel: borrar una reseña pide confirmación', async () => {
+    const card = admin.locator('.rev', { hasText: `Auto ${RUN}` });
+    await card.locator('text=Borrar').click();
+    await admin.waitForSelector('dialog.modal[open]');
+    await admin.click('dialog >> text=Sí, borrar');
+    await admin.waitForSelector(`.rev:has-text("Auto ${RUN}")`, { state: 'detached' });
+  });
+  await step('sin errores de consola en la página de reseñas', async () => { assert.deepEqual(rvErrors, []); });
+  await rvCtx.close();
 
   /* ================= 7. Escritorio ================= */
   console.log('\n▶ Escritorio');
@@ -472,7 +611,11 @@ async function apiJson(p, { method = 'GET', body, token } = {}) {
   /* ================= Limpieza ================= */
   console.log('\n▶ Limpieza');
   await step('restaurar ajustes y borrar los datos de prueba', async () => {
-    await apiJson('/api/admin/ajustes', { method: 'PUT', token, body: { facebook: settings0.facebook, pedidos_activos: settings0.pedidos_activos } });
+    await apiJson('/api/admin/ajustes', { method: 'PUT', token, body: {
+      facebook: settings0.facebook, pedidos_activos: settings0.pedidos_activos,
+      google_place_id: settings0.google_place_id || '' } });
+    for (const id of creadas) await apiJson(`/api/admin/resenas/${id}`, { method: 'DELETE', token });
+    for (const r of (await apiJson('/api/admin/resenas?tipo=todas', { token })).json.filter((x) => x.comentario.includes(RUN))) await apiJson(`/api/admin/resenas/${r.id}`, { method: 'DELETE', token });
     const dishes = (await apiJson('/api/admin/platillos', { token })).json.filter((d) => d.nombre.includes(RUN));
     for (const d of dishes) assert.equal((await apiJson(`/api/admin/platillos/${d.id}`, { method: 'DELETE', token })).status, 204);
     const cat = (await apiJson('/api/admin/categorias', { token })).json.find((c) => c.nombre === catName);

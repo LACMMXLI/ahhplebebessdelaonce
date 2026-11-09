@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { query, tx } from '../db.js';
 import { imageUrl, thumbUrl } from '../storage.js';
 import { HttpError, parse, wrap } from '../http.js';
+import { config } from '../config.js';
 
 const router = Router();
 
@@ -12,10 +13,18 @@ export async function loadSettings() {
   return Object.fromEntries(rows.map((r) => [r.clave, r.valor]));
 }
 
+/** Convierte los ajustes guardados como texto a los tipos que usa la API. */
+export const presentSettings = (s) => ({
+  ...s,
+  pedidos_activos: s.pedidos_activos !== 'false',
+});
+
+export const googleReviewUrl = (placeId) => `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
+
 router.get('/settings', wrap(async (_req, res) => {
-  const s = await loadSettings();
+  const { google_place_id: _oculto, ...publicos } = await loadSettings();
   res.set('Cache-Control', 'no-cache'); // ETag: el navegador revalida y los cambios del dueño se ven al instante
-  res.json({ ...s, pedidos_activos: s.pedidos_activos !== 'false' });
+  res.json(presentSettings(publicos));
 }));
 
 router.get('/menu', wrap(async (_req, res) => {
@@ -49,7 +58,7 @@ const orderSchema = z.object({
 });
 
 const orderLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false,
+  windowMs: 15 * 60 * 1000, limit: config.ordersLimit, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Demasiados pedidos seguidos. Intenta en unos minutos o llámanos.' },
 });
 
@@ -118,6 +127,40 @@ router.post('/orders', orderLimiter, wrap(async (req, res) => {
     folio: pedido.id,
     total,
     whatsapp_url: digits ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : null,
+  });
+}));
+
+/* ---------- Reseñas: 4-5 ★ van a Google, 1-3 ★ quedan como retroalimentación interna ---------- */
+const reviewSchema = z.object({
+  calificacion: z.number().int().min(1, 'Elige de 1 a 5 estrellas').max(5, 'Elige de 1 a 5 estrellas'),
+  comentario: z.string().trim().max(1000, 'El mensaje es muy largo').optional().default(''),
+  nombre: z.string().trim().max(60).optional().default(''),
+  contacto: z.string().trim().max(60).optional().default(''),
+  pedido: z.number().int().positive().optional(),
+});
+
+const reviewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, limit: config.reviewsLimit, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Ya recibimos tu opinión. ¡Gracias!' },
+});
+
+router.post('/reviews', reviewLimiter, wrap(async (req, res) => {
+  const b = parse(reviewSchema, req.body);
+  const settings = await loadSettings();
+  const alta = b.calificacion >= 4;
+  let pedidoId = null;
+  if (b.pedido) pedidoId = (await query('SELECT id FROM pedidos WHERE id = $1', [b.pedido])).rows[0]?.id ?? null;
+  // Las calificaciones altas solo cuentan para las métricas: no se guarda texto ni datos personales.
+  const { rows } = await query(
+    `INSERT INTO resenas (calificacion, destino, comentario, nombre, contacto, pedido_id, estado)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [b.calificacion, alta ? 'google' : 'interno', alta ? '' : b.comentario, alta ? '' : b.nombre, alta ? '' : b.contacto, pedidoId, alta ? 'atendida' : 'nuevo']);
+  const placeId = settings.google_place_id;
+  res.status(201).json({
+    id: rows[0].id,
+    destino: alta ? 'google' : 'interno',
+    // Solo 4-5 estrellas reciben el enlace de Google; 1-3 quedan como retroalimentación interna.
+    url: alta && placeId ? googleReviewUrl(placeId) : null,
   });
 }));
 

@@ -6,7 +6,7 @@ import { config } from '../config.js';
 import { requireAuth } from '../auth.js';
 import { deleteImage, imageUrl, saveImage, thumbUrl } from '../storage.js';
 import { HttpError, idParam, parse, precio, wrap } from '../http.js';
-import { loadSettings } from './public.js';
+import { loadSettings, presentSettings, googleReviewUrl } from './public.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -178,11 +178,11 @@ const ajustesSchema = z.object({
   maps: url, facebook: url, tiktok: url, instagram: url, youtube: url,
   horario: z.string().trim().max(300),
   pedidos_activos: z.boolean(),
+  google_place_id: z.string().trim().max(120).refine((v) => v === '' || /^[A-Za-z0-9_-]{10,120}$/.test(v), 'El ID de lugar de Google no parece válido (solo letras, números, guion y guion bajo)'),
 }).partial();
 
 router.get('/ajustes', wrap(async (_req, res) => {
-  const s = await loadSettings();
-  res.json({ ...s, pedidos_activos: s.pedidos_activos !== 'false' });
+  res.json(presentSettings(await loadSettings()));
 }));
 
 router.put('/ajustes', wrap(async (req, res) => {
@@ -192,8 +192,68 @@ router.put('/ajustes', wrap(async (req, res) => {
       'INSERT INTO ajustes (clave, valor) VALUES ($1,$2) ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor',
       [clave, String(valor)]);
   }
-  const s = await loadSettings();
-  res.json({ ...s, pedidos_activos: s.pedidos_activos !== 'false' });
+  res.json(presentSettings(await loadSettings()));
+}));
+
+/* ---------- Reseñas ---------- */
+router.get('/resenas/resumen', wrap(async (_req, res) => {
+  const tz = config.timezone;
+  const [tot, dist, trend, settings] = await Promise.all([
+    query(`SELECT count(*)::int AS total,
+                  COALESCE(round(avg(calificacion)::numeric, 2), 0) AS promedio,
+                  count(*) FILTER (WHERE destino='google')::int AS google,
+                  count(*) FILTER (WHERE destino='interno')::int AS internas,
+                  count(*) FILTER (WHERE destino='interno' AND estado='nuevo')::int AS pendientes,
+                  count(*) FILTER (WHERE created_at > now() - interval '30 days')::int AS ultimos30
+           FROM resenas`),
+    query('SELECT calificacion, count(*)::int AS n FROM resenas GROUP BY calificacion'),
+    query(`SELECT to_char(d, 'YYYY-MM-DD') AS dia,
+                  count(r.id)::int AS total,
+                  count(r.id) FILTER (WHERE r.destino='interno')::int AS internas
+           FROM generate_series((now() AT TIME ZONE $1)::date - 13, (now() AT TIME ZONE $1)::date, interval '1 day') d
+           LEFT JOIN resenas r ON (r.created_at AT TIME ZONE $1)::date = d::date
+           GROUP BY d ORDER BY d`, [tz]),
+    loadSettings(),
+  ]);
+  const distribucion = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  for (const r of dist.rows) distribucion[r.calificacion] = r.n;
+  res.json({
+    ...tot.rows[0],
+    distribucion,
+    tendencia: trend.rows,
+    google_configurado: Boolean(settings.google_place_id),
+    enlace_google: settings.google_place_id ? googleReviewUrl(settings.google_place_id) : null,
+  });
+}));
+
+router.get('/resenas', wrap(async (req, res) => {
+  const tipo = req.query.tipo || 'pendientes';
+  const filtros = {
+    pendientes: "r.destino = 'interno' AND r.estado = 'nuevo'",
+    internas: "r.destino = 'interno'",
+    google: "r.destino = 'google'",
+    todas: 'true',
+  };
+  if (!filtros[tipo]) throw new HttpError(400, 'Tipo inválido');
+  const limit = Math.min(Number(req.query.limit) || 100, 300);
+  const { rows } = await query(
+    `SELECT r.*, p.cliente_nombre AS pedido_cliente
+     FROM resenas r LEFT JOIN pedidos p ON p.id = r.pedido_id
+     WHERE ${filtros[tipo]} ORDER BY r.created_at DESC LIMIT $1`, [limit]);
+  res.json(rows);
+}));
+
+router.patch('/resenas/:id/estado', wrap(async (req, res) => {
+  const { estado } = parse(z.object({ estado: z.enum(['nuevo', 'atendida']) }), req.body);
+  const { rows } = await query("UPDATE resenas SET estado=$1 WHERE id=$2 AND destino='interno' RETURNING *", [estado, idParam(req)]);
+  if (!rows[0]) throw new HttpError(404, 'Reseña no encontrada');
+  res.json(rows[0]);
+}));
+
+router.delete('/resenas/:id', wrap(async (req, res) => {
+  const r = await query('DELETE FROM resenas WHERE id=$1', [idParam(req)]);
+  if (!r.rowCount) throw new HttpError(404, 'Reseña no encontrada');
+  res.status(204).end();
 }));
 
 export default router;
