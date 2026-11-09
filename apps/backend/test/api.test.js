@@ -272,7 +272,9 @@ test('reseñas: 4-5★ van a Google, 1-3★ quedan como retroalimentación inter
   const put = (body) => api('/api/admin/ajustes', { method: 'PUT', auth: true, body });
   const ID = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
 
-  // Sin ID de Google configurado no se inventa ningún enlace
+  // La migración 005 deja el ID del negocio; lo vaciamos para probar que sin ID no se inventa ningún enlace
+  assert.equal((await api('/api/admin/ajustes', { auth: true })).json.google_place_id, 'ChIJ13nmmzl614ARSHfNKBkOcpM');
+  assert.equal((await put({ google_place_id: '' })).status, 200);
   const a = await post({ calificacion: 5 });
   assert.equal(a.status, 201);
   assert.equal(a.json.destino, 'google');
