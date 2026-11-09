@@ -363,6 +363,38 @@ test('reseñas: 4-5★ van a Google, 1-3★ quedan como retroalimentación inter
   for (const p of ['/api/admin/resenas', '/api/admin/resenas/resumen']) assert.equal((await api(p)).status, 401, p);
 });
 
+test('usuarios: el dueño crea, cambia la contraseña y borra usuarios del panel', async () => {
+  const nuevo = { email: 'Cajero@Example.com', nombre: 'Cajero', password: 'clave-del-cajero-1' };
+  const c = await api('/api/admin/usuarios', { method: 'POST', auth: true, body: nuevo });
+  assert.equal(c.status, 201);
+  assert.equal(c.json.email, 'cajero@example.com');
+  assert.equal('password_hash' in c.json, false, 'nunca se devuelve la contraseña');
+  assert.equal((await api('/api/admin/usuarios', { method: 'POST', auth: true, body: nuevo })).status, 409, 'correo repetido');
+  assert.equal((await api('/api/admin/usuarios', { method: 'POST', auth: true, body: { ...nuevo, email: 'otro@example.com', password: 'corta' } })).status, 400);
+  assert.equal((await api('/api/admin/usuarios', { method: 'POST', auth: true, body: { ...nuevo, email: 'no-es-correo' } })).status, 400);
+
+  // el nuevo usuario puede entrar
+  const login = await api('/api/auth/login', { method: 'POST', body: { email: 'cajero@example.com', password: nuevo.password } });
+  assert.equal(login.status, 200);
+
+  const lista = (await api('/api/admin/usuarios', { auth: true })).json;
+  assert.equal(lista.length, 2);
+  assert.equal(lista.filter((u) => u.yo).length, 1);
+  assert.ok(lista.every((u) => !('password_hash' in u)));
+
+  // restablecer contraseña
+  assert.equal((await api(`/api/admin/usuarios/${c.json.id}/password`, { method: 'PUT', auth: true, body: { password: 'nueva-clave-cajero-2' } })).status, 200);
+  assert.equal((await api('/api/auth/login', { method: 'POST', body: { email: 'cajero@example.com', password: nuevo.password } })).status, 401);
+  assert.equal((await api('/api/auth/login', { method: 'POST', body: { email: 'cajero@example.com', password: 'nueva-clave-cajero-2' } })).status, 200);
+
+  // no puede borrarse a sí mismo; sí al otro
+  const yo = lista.find((u) => u.yo);
+  assert.equal((await api(`/api/admin/usuarios/${yo.id}`, { method: 'DELETE', auth: true })).status, 400);
+  assert.equal((await api(`/api/admin/usuarios/${c.json.id}`, { method: 'DELETE', auth: true })).status, 204);
+  assert.equal((await api(`/api/admin/usuarios/${c.json.id}`, { method: 'DELETE', auth: true })).status, 404);
+  assert.equal((await api('/api/admin/usuarios')).status, 401, 'exige sesión');
+});
+
 // Va al final: agota el límite de intentos fallidos de esta IP.
 test('login: los accesos correctos no agotan el límite, los fallidos sí', async () => {
   for (let i = 0; i < 12; i++) {

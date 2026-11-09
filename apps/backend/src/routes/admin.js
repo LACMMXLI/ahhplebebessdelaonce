@@ -3,7 +3,7 @@ import multer from 'multer';
 import { z } from 'zod';
 import { query } from '../db.js';
 import { config } from '../config.js';
-import { requireAuth } from '../auth.js';
+import { hashPassword, requireAuth } from '../auth.js';
 import { deleteImage, imageUrl, saveImage, thumbUrl } from '../storage.js';
 import { HttpError, idParam, parse, precio, wrap } from '../http.js';
 import { loadSettings, presentSettings, googleReviewUrl } from './public.js';
@@ -193,6 +193,46 @@ router.put('/ajustes', wrap(async (req, res) => {
       [clave, String(valor)]);
   }
   res.json(presentSettings(await loadSettings()));
+}));
+
+/* ---------- Usuarios del panel ---------- */
+const usuarioSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Escribe un correo válido').max(120),
+  nombre: z.string().trim().max(60).default(''),
+  password: z.string().min(10, 'La contraseña debe tener al menos 10 caracteres').max(200),
+});
+
+router.get('/usuarios', wrap(async (req, res) => {
+  const { rows } = await query('SELECT id, email, nombre, created_at FROM usuarios ORDER BY id');
+  res.json(rows.map((u) => ({ ...u, yo: u.id === req.user.id })));
+}));
+
+router.post('/usuarios', wrap(async (req, res) => {
+  const b = parse(usuarioSchema, req.body);
+  try {
+    const { rows } = await query(
+      'INSERT INTO usuarios (email, nombre, password_hash) VALUES ($1,$2,$3) RETURNING id, email, nombre, created_at',
+      [b.email, b.nombre, hashPassword(b.password)]);
+    res.status(201).json(rows[0]);
+  } catch (e) {
+    if (e.code === '23505') throw new HttpError(409, 'Ya existe un usuario con ese correo');
+    throw e;
+  }
+}));
+
+router.put('/usuarios/:id/password', wrap(async (req, res) => {
+  const { password } = parse(usuarioSchema.pick({ password: true }), req.body);
+  const r = await query('UPDATE usuarios SET password_hash=$1 WHERE id=$2', [hashPassword(password), idParam(req)]);
+  if (!r.rowCount) throw new HttpError(404, 'Usuario no encontrado');
+  res.json({ ok: true });
+}));
+
+router.delete('/usuarios/:id', wrap(async (req, res) => {
+  const id = idParam(req);
+  if (id === req.user.id) throw new HttpError(400, 'No puedes borrar tu propio usuario');
+  const r = await query('DELETE FROM usuarios WHERE id=$1', [id]);
+  if (!r.rowCount) throw new HttpError(404, 'Usuario no encontrado');
+  res.status(204).end();
 }));
 
 /* ---------- Reseñas ---------- */

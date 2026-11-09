@@ -611,6 +611,61 @@ async function viewAjustes(pane) {
     form);
 }
 
+/* ---------- Usuarios del sistema ---------- */
+function editarUsuario(onSaved) {
+  const email = h('input', { type: 'email', required: true, maxLength: 120, autocomplete: 'off', inputMode: 'email' });
+  const nombre = h('input', { maxLength: 60, autocomplete: 'off' });
+  const clave = h('input', { type: 'password', required: true, minLength: 10, autocomplete: 'new-password' });
+  const err = errBox();
+  modal('Nuevo usuario', h('div', { class: 'form' },
+    field('Correo (con este entra al panel)', email), field('Nombre (opcional)', nombre),
+    field('Contraseña', clave, 'Mínimo 10 caracteres. Compártesela a la persona; podrá cambiarla en Cuenta.'), err),
+  (close) => [h('button', { class: 'btn', type: 'button', onclick: close }, 'Cancelar'),
+    h('button', { class: 'btn primary rp', type: 'button', onclick: async (e) => {
+      showErr(err, '');
+      if (!email.value.trim() || clave.value.length < 10) { showErr(err, 'Escribe el correo y una contraseña de al menos 10 caracteres'); return; }
+      const btn = e.currentTarget; btn.disabled = true;
+      try { await api('/api/admin/usuarios', { method: 'POST', body: { email: email.value, nombre: nombre.value, password: clave.value } }); close(); toast('Usuario creado ✓'); onSaved(); }
+      catch (ex) { showErr(err, ex.message); btn.disabled = false; }
+    } }, 'Crear usuario')]);
+}
+
+function cambiarClaveUsuario(u) {
+  const clave = h('input', { type: 'password', required: true, minLength: 10, autocomplete: 'new-password' });
+  const err = errBox();
+  modal(`Nueva contraseña para ${u.email}`, h('div', { class: 'form' }, field('Contraseña nueva', clave, 'Mínimo 10 caracteres.'), err),
+  (close) => [h('button', { class: 'btn', type: 'button', onclick: close }, 'Cancelar'),
+    h('button', { class: 'btn primary rp', type: 'button', onclick: async (e) => {
+      showErr(err, '');
+      if (clave.value.length < 10) { showErr(err, 'Mínimo 10 caracteres'); return; }
+      const btn = e.currentTarget; btn.disabled = true;
+      try { await api(`/api/admin/usuarios/${u.id}/password`, { method: 'PUT', body: { password: clave.value } }); close(); toast('Contraseña actualizada ✓'); }
+      catch (ex) { showErr(err, ex.message); btn.disabled = false; }
+    } }, 'Guardar')]);
+}
+
+async function usuariosCard() {
+  const list = h('div', { class: 'clist' });
+  const draw = async () => {
+    const usuarios = await api('/api/admin/usuarios');
+    list.replaceChildren(...usuarios.map((u) => h('div', { class: 'crow' },
+      h('div', { class: 't' }, h('b', {}, u.nombre || u.email), h('span', { class: 'muted' }, u.nombre ? u.email : '', u.yo ? (u.nombre ? ' · ' : '') + 'Tú' : '')),
+      u.yo ? null : h('div', { class: 'acts' },
+        h('button', { class: 'btn sm rp', type: 'button', onclick: () => cambiarClaveUsuario(u) }, 'Contraseña'),
+        h('button', { class: 'btn sm danger', type: 'button', onclick: async () => {
+          if (!(await ask(`¿Borrar a ${u.email}?`, 'Esta persona ya no podrá entrar al panel.', 'Sí, borrar'))) return;
+          try { await api(`/api/admin/usuarios/${u.id}`, { method: 'DELETE' }); toast('Usuario borrado'); draw(); } catch (e) { fail(e); }
+        } }, 'Borrar')))));
+  };
+  const card = h('section', { class: 'card', style: 'margin-top:14px;max-width:520px' },
+    h('div', { class: 'bar', style: 'margin-bottom:10px' }, h('h3', { style: 'margin:0' }, 'Usuarios del sistema'),
+      h('button', { class: 'btn sm primary rp', type: 'button', onclick: () => editarUsuario(draw) }, icon('plus'), 'Nuevo usuario')),
+    h('p', { class: 'muted', style: 'margin:0 0 12px' }, 'Todos los usuarios tienen el mismo acceso al panel: pedidos, platillos, reseñas y ajustes.'),
+    list);
+  await draw();
+  return card;
+}
+
 /* ---------- Cuenta ---------- */
 async function viewCuenta(pane) {
   const { user } = await api('/api/auth/me');
@@ -628,7 +683,7 @@ async function viewCuenta(pane) {
     field('Contraseña nueva', h('input', { name: 'nueva', type: 'password', required: true, minLength: 10, autocomplete: 'new-password' }), 'Mínimo 10 caracteres.'),
     field('Repite la nueva', h('input', { name: 'repetir', type: 'password', required: true, minLength: 10, autocomplete: 'new-password' })),
     err, h('div', {}, h('button', { class: 'btn primary rp', type: 'submit' }, 'Cambiar contraseña')));
-  pane.replaceChildren(h('div', { class: 'pane-head' }, h('h2', {}, 'Cuenta')), form,
+  pane.replaceChildren(h('div', { class: 'pane-head' }, h('h2', {}, 'Cuenta')), form, await usuariosCard(),
     h('div', { style: 'margin-top:18px' }, h('button', { class: 'btn danger', type: 'button', onclick: () => logout() }, 'Cerrar sesión')));
 }
 
