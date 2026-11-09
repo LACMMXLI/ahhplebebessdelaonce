@@ -90,18 +90,13 @@ function showForm(n) {
     const fd = new FormData(form);
     try {
       await api('/api/reviews', { method: 'POST', body: {
-        calificacion: n, comentario: fd.get('comentario'), nombre: fd.get('nombre'), contacto: fd.get('contacto'), pedido } });
+        calificacion: n, comentario: fd.get('comentario'), pedido } });
       showThanksLow();
     } catch (ex) {
       err.textContent = ex.message; err.hidden = false; btn.disabled = false; btn.textContent = 'Enviar';
     }
   } },
     h('div', { class: 'fld' }, h('label', { for: 'f-msg' }, 'Tu mensaje'), area, counter),
-    h('div', { class: 'fld' }, h('label', { for: 'f-nom' }, 'Tu nombre (opcional)'),
-      h('input', { id: 'f-nom', name: 'nombre', maxLength: 60, autocomplete: 'name' })),
-    h('div', { class: 'fld' }, h('label', { for: 'f-con' }, 'Teléfono o correo, si quieres que te contactemos (opcional)'),
-      h('input', { id: 'f-con', name: 'contacto', maxLength: 60, autocomplete: 'tel' })),
-    h('p', { class: 'note' }, 'Tu mensaje se envía directamente al negocio como retroalimentación. No se publica en Google.'),
     err,
     h('div', { class: 'acts' },
       h('button', { class: 'r-btn ghost rp', type: 'button', onclick: () => showRate(0) }, 'Cancelar'), btn));

@@ -495,8 +495,6 @@ async function apiJson(p, { method = 'GET', body, token } = {}) {
     await rv.waitForSelector('textarea');
     assert.equal(await rv.locator('a[href*="google"]').count(), 0);
     await rv.fill('textarea', `Tardó mucho ${RUN}`);
-    await rv.fill('input[name=nombre]', 'Cliente Prueba');
-    await rv.fill('input[name=contacto]', '686 123 0000');
     await axeCheck(rv, 'reseñas: formulario');
     await shot(rv, 'resenas-formulario-390');
     await rv.click('button[type=submit]');
@@ -542,9 +540,7 @@ async function apiJson(p, { method = 'GET', body, token } = {}) {
     const card = admin.locator('.rev', { hasText: `Tardó mucho ${RUN}` });
     await card.waitFor();
     const txt = await card.innerText();
-    assert.match(txt, /Cliente Prueba/); assert.match(txt, /por atender/i); assert.match(txt, /\b20\d\d\b/, 'muestra la fecha');
-    assert.equal(await card.locator('a[href^="tel:"]').count(), 1);
-    assert.match(await card.locator('a[href^="https://wa.me/"]').getAttribute('href'), /wa\.me\/526861230000$/);
+    assert.match(txt, /por atender/i); assert.match(txt, /\b20\d\d\b/, 'muestra la fecha');
     assert.equal(await card.locator('.rstars svg:not(.off)').count(), 2, '2 estrellas llenas');
     await shot(admin, 'admin-resenas-390');
     await axeCheck(admin, 'admin reseñas');
