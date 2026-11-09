@@ -59,14 +59,15 @@ export async function api(path, { method = 'GET', body, form, token, timeout = 1
 /* ---------- Ajustes del negocio, con respaldo si el backend no responde ---------- */
 export const DEFAULT_SETTINGS = {
   nombre: 'Los Plebes de la Once',
-  slogan: 'Andamos al cien mi gente bonita. Hay que pasárnosla bien.',
+  slogan: 'Donde el antojo se vuelve arte',
   telefono: '686 202 9161',
   whatsapp: '526862029161',
   direccion: 'Prolongación H. Colegio Militar #1242, Col. Voluntad, Mexicali, B.C.',
   maps: 'https://www.google.com/maps/search/?api=1&query=Prolongaci%C3%B3n%20H%20Colegio%20Militar%201242%20Colonia%20Voluntad%20Mexicali%20Baja%20California',
   facebook: '', tiktok: '', instagram: '',
   youtube: 'https://www.youtube.com/@michingontb3',
-  horario: '',
+  google_reviews: '',
+  horario: '5 PM a 3 AM',
   pedidos_activos: true,
 };
 

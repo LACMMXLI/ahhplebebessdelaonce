@@ -175,7 +175,7 @@ const ajustesSchema = z.object({
   telefono: z.string().trim().max(25),
   whatsapp: z.string().trim().max(20).refine((v) => v === '' || /^\d{10,15}$/.test(v), 'Solo dígitos con lada, ej. 526862029161'),
   direccion: z.string().trim().max(250),
-  maps: url, facebook: url, tiktok: url, instagram: url, youtube: url,
+  maps: url, facebook: url, tiktok: url, instagram: url, youtube: url, google_reviews: url,
   horario: z.string().trim().max(300),
   pedidos_activos: z.boolean(),
   google_place_id: z.string().trim().max(120).refine((v) => v === '' || /^[A-Za-z0-9_-]{10,120}$/.test(v), 'El ID de lugar de Google no parece válido (solo letras, números, guion y guion bajo)'),

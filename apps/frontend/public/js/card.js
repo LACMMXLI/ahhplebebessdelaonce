@@ -49,6 +49,8 @@ function render(s) {
   ]; // todas se muestran; las que aún no tienen enlace avisan "muy pronto"
 
   const maps = safeUrl(s.maps) || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.direccion)}`;
+  const reviewsUrl = safeUrl(s.google_reviews)
+    || (s.maps ? s.maps : (s.direccion ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${s.nombre} ${s.direccion}`)}` : null));
   const [l1, l2] = s.slogan.split(/(?<=\.)\s+/);
 
   const nodes = [
@@ -67,8 +69,8 @@ function render(s) {
     h('div', { class: 'duo rv' },
       h('a', { class: 'pill rp lift', href: telHref(s) }, icon('phone'),
         h('span', {}, h('b', {}, 'Llamar ahora'), h('small', {}, s.telefono)), chev()),
-      linkOrSoon(wa, 'WhatsApp', { class: 'pill wa rp lift' }, icon('waline'),
-        h('span', {}, h('b', {}, 'WhatsApp'), h('small', {}, s.telefono)), chev())),
+      linkOrSoon(reviewsUrl, 'Google Reseñas', { class: 'pill google rp lift' }, icon('google'),
+        h('span', {}, h('b', {}, 'Calificar'), h('small', {}, 'Google Reseñas')), chev())),
     h('a', { class: 'row row-map first rp lift rv', href: maps, ...external },
       h('span', { class: 'row-ico pin' }, icon('pin')),
       h('span', { class: 'row-txt' }, h('b', {}, 'Cómo llegar'), h('small', {}, s.direccion)),
