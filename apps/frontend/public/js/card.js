@@ -1,6 +1,6 @@
 import { h, loadSettings, safeUrl, telHref, waHref, toast, linkOrSoon, DEFAULT_SETTINGS } from './lib.js';
 import { icon } from './icons.js';
-import { embers, reveal, ripples } from './fx.js';
+import { embers, reveal, ripples, sparks, pointerFx, parallax } from './fx.js';
 
 const root = document.getElementById('card');
 
@@ -34,6 +34,7 @@ async function share(s) {
   catch { toast(`Comparte este enlace: ${data.url}`); }
 }
 
+const spark = (n) => h('i', { class: `spark s${n}`, 'aria-hidden': 'true' });
 const chev = () => h('span', { class: 'chev' }, icon('chevron'));
 const external = { target: '_blank', rel: 'noopener noreferrer' };
 let first = true;
@@ -59,25 +60,26 @@ function render(s) {
     h('p', { class: 'hours' }, icon('clock'), s.horario || 'Horario próximamente'),
     h('nav', { class: 'tiles rv', 'aria-label': 'Redes sociales' }, social.map(([k, label, href]) =>
       linkOrSoon(href, label, { class: `tile ${k} rp lift` }, icon(k), label))),
-    h('a', { class: 'cta rp lift rv', href: 'menu/' },
+    h('a', { class: 'cta rp lift tilt rv', href: 'menu/' },
+      spark(1), spark(2), spark(3),
       icon('burger', 'cta-ico'),
       h('span', { class: 'cta-txt' }, h('b', {}, 'Ver menú digital'),
         h('small', {}, s.pedidos_activos ? 'Descubre todos nuestros platillos y pide' : 'Descubre todos nuestros platillos')),
       icon('burgerGhost', 'cta-ghost'), chev()),
     h('div', { class: 'duo rv' },
-      h('a', { class: 'pill rp lift', href: telHref(s) }, icon('phone'),
+      h('a', { class: 'pill rp lift tilt', href: telHref(s) }, icon('phone'),
         h('span', {}, h('b', {}, 'Llamar ahora'), h('small', {}, s.telefono)), chev()),
-      h('a', { class: 'pill google rp lift', href: 'resenas/' }, icon('google'),
+      h('a', { class: 'pill google rp lift tilt', href: 'resenas/' }, icon('google'),
         h('span', {}, h('b', {}, 'Calificar'), h('small', {}, 'Google Reseñas')), chev())),
-    h('a', { class: 'row row-map first rp lift rv', href: maps, ...external },
+    h('a', { class: 'row row-map first rp lift tilt rv', href: maps, ...external },
       h('span', { class: 'row-ico pin' }, icon('pin')),
       h('span', { class: 'row-txt' }, h('b', {}, 'Cómo llegar'), h('small', {}, s.direccion)),
       icon('map', 'art'), chev()),
-    h('button', { class: 'row row-vcard rp lift rv', type: 'button', onclick: () => vcard(s) },
+    h('button', { class: 'row row-vcard rp lift tilt rv', type: 'button', onclick: () => vcard(s) },
       h('span', { class: 'row-ico' }, icon('user')),
       h('span', { class: 'row-txt' }, h('b', {}, 'Guardar contacto'), h('small', {}, 'Agrega nuestros datos a tu celular')),
       icon('phoneArt', 'art'), chev()),
-    h('button', { class: 'row row-share rp lift rv', type: 'button', onclick: () => share(s) },
+    h('button', { class: 'row row-share rp lift tilt rv', type: 'button', onclick: () => share(s) },
       h('span', { class: 'row-ico' }, icon('share')),
       h('span', { class: 'row-txt' }, h('b', {}, 'Compartir tarjeta'), h('small', {}, 'Comparte nuestro restaurante')),
       icon('arrowArt', 'art'), chev()),
@@ -88,11 +90,18 @@ function render(s) {
   root.replaceChildren(...nodes.filter(Boolean));
   document.title = `${s.nombre} · Tarjeta digital`;
   // El título y el eslogan ya están en pantalla; el resto aparece escalonado al hacer scroll.
-  if (first) { first = false; reveal(root); } else root.querySelectorAll('.rv').forEach((el) => { el.classList.add('in'); el.style.animation = 'none'; el.style.opacity = '1'; el.style.transform = 'none'; });
+  if (first) { first = false; reveal(root); } else {
+    // Segunda pintada (llegaron los datos del servidor): sin repetir las animaciones de entrada.
+    root.classList.add('settled');
+    root.querySelectorAll('.rv').forEach((el) => el.classList.add('in', 'shown'));
+  }
 }
 
 embers();
 ripples();
+sparks();
+pointerFx();
+parallax(document.querySelector('.hero'));
 // Pinta al instante con los datos por defecto (la tarjeta funciona aunque el backend esté caído)
 // y se actualiza en cuanto el servidor responde.
 render(DEFAULT_SETTINGS);
