@@ -11,8 +11,9 @@ try { token = sessionStorage.getItem(TOKEN_KEY); } catch { /* sin almacenamiento
 let view = 'pedidos';
 let pollTimer;
 let lastNuevos = null;
+let lastResenas = null;
 let audioCtx;
-const state = { nuevos: 0, online: true, refreshOrders: null, drawNav: null };
+const state = { nuevos: 0, resenas: 0, online: true, refreshOrders: null, refreshResenas: null, drawNav: null, go: null };
 
 /* ---------- Acceso a la API con la sesión ---------- */
 async function api(path, opts = {}) {
@@ -34,7 +35,7 @@ function setOnline(ok) {
 }
 
 function logout(msg) {
-  token = null; lastNuevos = null;
+  token = null; lastNuevos = null; lastResenas = null; state.nuevos = 0; state.resenas = 0;
   try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* ignorar */ }
   clearInterval(pollTimer);
   document.title = 'Panel · Los Plebes de la Once';
@@ -115,14 +116,14 @@ function renderLogin(msg) {
 }
 
 /* ---------- Estructura ---------- */
-const TABS = [['pedidos', 'Pedidos', 'receipt'], ['platillos', 'Platillos', 'grid'], ['categorias', 'Categorías', 'tag'], ['ajustes', 'Ajustes', 'sliders'], ['cuenta', 'Cuenta', 'lock']];
-const views = { pedidos: viewPedidos, platillos: viewPlatillos, categorias: viewCategorias, ajustes: viewAjustes, cuenta: viewCuenta };
+const TABS = [['pedidos', 'Pedidos', 'receipt'], ['platillos', 'Platillos', 'grid'], ['categorias', 'Categorías', 'tag'], ['resenas', 'Reseñas', 'star'], ['ajustes', 'Ajustes', 'sliders'], ['cuenta', 'Cuenta', 'lock']];
+const views = { pedidos: viewPedidos, platillos: viewPlatillos, categorias: viewCategorias, resenas: viewResenas, ajustes: viewAjustes, cuenta: viewCuenta };
 
 function renderShell() {
   const pane = h('main', { class: 'pane', id: 'pane', tabindex: '-1' });
   const title = h('h1', {});
   const navBtn = (k, label, ic) => h('button', { class: 'nav rp', type: 'button', dataset: { v: k }, onclick: () => go(k) },
-    icon(ic), label, k === 'pedidos' ? h('span', { class: 'badge', hidden: !state.nuevos, 'aria-label': `${state.nuevos} pedidos nuevos` }, String(state.nuevos)) : null);
+    icon(ic), label, (k === 'pedidos' || k === 'resenas') ? h('span', { class: `badge${k === 'resenas' ? ' amber' : ''}`, hidden: true }, '0') : null);
   const side = h('aside', { class: 'side', 'aria-label': 'Navegación' },
     h('div', { class: 'brand' }, h('img', { src: '../assets/logo.webp', alt: '' }), h('div', {}, h('b', {}, 'Los Plebes'), h('small', {}, 'Panel del negocio'))),
     ...TABS.map(([k, l, i]) => navBtn(k, l, i)),
@@ -140,12 +141,18 @@ function renderShell() {
   state.drawNav = () => {
     document.querySelectorAll('.nav[data-v]').forEach((b) => {
       b.setAttribute('aria-current', b.dataset.v === view ? 'page' : 'false');
-      if (b.dataset.v === 'pedidos') { const bd = b.querySelector('.badge'); bd.textContent = String(state.nuevos); bd.hidden = !state.nuevos; bd.setAttribute('aria-label', `${state.nuevos} pedidos nuevos`); }
+      const bd = b.querySelector('.badge');
+      if (bd) {
+        const n = b.dataset.v === 'pedidos' ? state.nuevos : state.resenas;
+        bd.textContent = String(n); bd.hidden = !n;
+        bd.setAttribute('aria-label', b.dataset.v === 'pedidos' ? `${n} pedidos nuevos` : `${n} comentarios por atender`);
+      }
     });
     title.textContent = TABS.find(([k]) => k === view)[1];
   };
-  const go = (k) => { view = k; state.refreshOrders = null; state.drawNav(); load(); pane.focus({ preventScroll: true }); scrollTo(0, 0); };
+  const go = (k) => { view = k; state.refreshOrders = null; state.refreshResenas = null; state.drawNav(); load(); pane.focus({ preventScroll: true }); scrollTo(0, 0); };
   const load = () => { pane.replaceChildren(h('p', { class: 'loading' }, 'Cargando…')); views[view](pane).catch((e) => { pane.replaceChildren(h('div', { class: 'empty' }, h('p', {}, e.message), h('button', { class: 'btn', type: 'button', onclick: load }, 'Reintentar'))); }); };
+  state.go = go;
   state.drawNav(); load();
   clearInterval(pollTimer);
   pollTimer = setInterval(poll, 10000);
@@ -163,6 +170,15 @@ async function poll() {
     lastNuevos = r.nuevos;
     if (state.nuevos !== r.nuevos) { state.nuevos = r.nuevos; state.drawNav?.(); }
     document.title = `${r.nuevos ? `(${r.nuevos}) ` : ''}Panel · Los Plebes de la Once`;
+  } catch { /* se reintenta en el siguiente ciclo */ }
+  try {
+    const rv = await api('/api/admin/resenas/resumen');
+    if (lastResenas !== null && rv.pendientes > lastResenas) {
+      beep(); toast('⭐ Un cliente dejó retroalimentación');
+      state.refreshResenas?.();
+    }
+    lastResenas = rv.pendientes;
+    if (state.resenas !== rv.pendientes) { state.resenas = rv.pendientes; state.drawNav?.(); }
   } catch { /* se reintenta en el siguiente ciclo */ }
 }
 
@@ -400,9 +416,111 @@ function editCat(c, onSaved) {
       } }, 'Guardar')]);
 }
 
-/* ---------- Enlace y código QR de la tarjeta ---------- */
-function qrCard() {
-  const url = `${location.origin}/`;
+/* ---------- Reseñas ---------- */
+const fechaLarga = (iso) => new Date(iso).toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const starsEl = (n) => h('span', { class: 'rstars', role: 'img', 'aria-label': `${n} de 5 estrellas` },
+  [1, 2, 3, 4, 5].map((i) => { const st = icon('star'); if (i > n) st.classList.add('off'); return st; }));
+
+function contactoEl(texto) {
+  if (!texto) return null;
+  const digitos = texto.replace(/\D/g, '');
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(texto)) return h('a', { href: `mailto:${texto}` }, texto);
+  if (digitos.length >= 8) {
+    const wa = digitos.length === 10 ? `52${digitos}` : digitos;
+    return h('span', {}, h('a', { href: `tel:+${wa}` }, texto), ' · ', h('a', { href: `https://wa.me/${wa}`, target: '_blank', rel: 'noopener noreferrer' }, 'WhatsApp'));
+  }
+  return h('span', {}, texto);
+}
+
+async function viewResenas(pane) {
+  let tipo = 'pendientes';
+  const banner = h('div');
+  const stats = h('section', { class: 'stats', 'aria-label': 'Resumen de reseñas' });
+  const nota = h('p', { class: 'muted', style: 'margin:-2px 0 14px' }, '"Enviadas a Google" cuenta a los clientes que dieron 4 o 5 estrellas y fueron dirigidos a tu enlace; Google no avisa cuántos llegaron a publicar su reseña.');
+  const charts = h('div', { class: 'rcharts' });
+  const tabs = h('div', { class: 'seg-tabs', role: 'tablist', 'aria-label': 'Filtrar reseñas' });
+  const list = h('div', { class: 'rlist', 'aria-live': 'polite' });
+  const stat = (cls, n, label) => h('div', { class: `stat ${cls}` }, h('b', {}, n), h('span', {}, label));
+
+  const distribucion = (m) => {
+    const max = Math.max(1, ...Object.values(m.distribucion));
+    const rows = [5, 4, 3, 2, 1].map((n) => {
+      const v = m.distribucion[n];
+      const fill = h('i', { style: 'width:0%' });
+      requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = `${(v / max) * 100}%`; }));
+      return h('div', { class: `dist-row ${n >= 4 ? 'hi' : 'lo'}` }, h('span', { class: 'n' }, `${n} ★`), h('div', { class: 'track' }, fill), h('span', { class: 'v' }, String(v)));
+    });
+    return h('section', { class: 'card' }, h('h3', {}, 'Calificaciones'), ...rows,
+      h('p', { class: 'muted', style: 'margin:10px 0 0' }, '4 y 5 estrellas van a Google; 1 a 3 quedan como retroalimentación privada.'));
+  };
+
+  const tendencia = (m) => {
+    const max = Math.max(1, ...m.tendencia.map((d) => d.total));
+    const resumen = `Calificaciones de los últimos 14 días: ${m.tendencia.map((d) => `${d.dia} ${d.total}`).join(', ')}`;
+    return h('section', { class: 'card' }, h('h3', {}, 'Últimos 14 días'),
+      h('div', { class: 'trend', role: 'img', 'aria-label': resumen },
+        m.tendencia.map((d) => h('div', { class: 'tcol', title: `${d.dia}: ${d.total} calificaciones (${d.internas} para atender)` },
+          h('div', { class: 'tbar' },
+            h('i', { class: 'g', style: `height:${((d.total - d.internas) / max) * 100}%` }),
+            h('i', { class: 'r', style: `height:${(d.internas / max) * 100}%` })),
+          h('span', {}, String(Number(d.dia.slice(8))))))),
+      h('p', { class: 'muted legend' }, h('span', { class: 'dot g' }), 'Enviadas a Google', h('span', { class: 'dot r' }), 'Retroalimentación'));
+  };
+
+  const item = (r) => {
+    const interno = r.destino === 'interno';
+    const mover = async (estado, btn) => {
+      btn.disabled = true;
+      try { await api(`/api/admin/resenas/${r.id}/estado`, { method: 'PATCH', body: { estado } }); await draw(); poll(); }
+      catch (e) { btn.disabled = false; fail(e); }
+    };
+    return h('article', { class: `rev ${interno ? (r.estado === 'nuevo' ? 'pend' : 'done') : 'goog'}`, dataset: { id: r.id } },
+      h('div', { class: 'rev-head' },
+        h('div', {}, starsEl(r.calificacion), h('div', { class: 'muted' }, fechaLarga(r.created_at))),
+        h('span', { class: `chip-s ${interno ? (r.estado === 'nuevo' ? 'nuevo' : 'listo') : 'entregado'}` },
+          interno ? (r.estado === 'nuevo' ? 'Por atender' : 'Atendida') : 'Enviada a Google')),
+      interno ? h('blockquote', { class: 'rev-msg' }, r.comentario || 'El cliente no dejó mensaje.') : null,
+      interno && (r.nombre || r.contacto || r.pedido_id) ? h('div', { class: 'rev-meta' },
+        r.nombre ? h('span', {}, `👤 ${r.nombre}`) : null,
+        r.contacto ? h('span', {}, '📞 ', contactoEl(r.contacto)) : null,
+        r.pedido_id ? h('span', {}, `🧾 Pedido #${r.pedido_id}${r.pedido_cliente ? ` · ${r.pedido_cliente}` : ''}`) : null) : null,
+      h('div', { class: 'rev-acts' },
+        interno ? h('button', { class: `btn sm rp ${r.estado === 'nuevo' ? 'green' : ''}`, type: 'button',
+          onclick: (e) => mover(r.estado === 'nuevo' ? 'atendida' : 'nuevo', e.currentTarget) }, r.estado === 'nuevo' ? 'Marcar atendida' : 'Reabrir') : null,
+        h('button', { class: 'btn sm danger', type: 'button', onclick: async () => {
+          if (!(await ask('¿Borrar esta reseña?', 'Se elimina del historial y de las métricas. Úsalo para spam o pruebas.', 'Sí, borrar'))) return;
+          try { await api(`/api/admin/resenas/${r.id}`, { method: 'DELETE' }); toast('Reseña borrada'); await draw(); poll(); } catch (e) { fail(e); }
+        } }, 'Borrar')));
+  };
+
+  async function draw() {
+    const [m, items] = await Promise.all([api('/api/admin/resenas/resumen'), api(`/api/admin/resenas?tipo=${tipo}`)]);
+    banner.replaceChildren(...(m.google_configurado ? [] : [h('div', { class: 'card warn' },
+      h('b', {}, 'Falta el ID de Google de tu negocio'),
+      h('p', { class: 'muted', style: 'margin:6px 0 10px' }, 'Mientras no lo captures, las calificaciones de 4 y 5 estrellas se cuentan pero no se envía a nadie a Google.'),
+      h('button', { class: 'btn sm primary rp', type: 'button', onclick: () => state.go?.('ajustes') }, 'Configurarlo en Ajustes'))]));
+    const pct = m.total ? Math.round((m.google / m.total) * 100) : 0;
+    stats.replaceChildren(
+      stat('s-sales', m.total ? m.promedio.toFixed(1) : '–', `Calificación promedio · ${m.total} en total`),
+      stat(`s-new${m.pendientes ? ' pulse' : ''}`, String(m.pendientes), 'Retroalimentación por atender'),
+      stat('s-ready', String(m.google), `Enviadas a Google · ${pct}% del total`),
+      stat('s-prep', String(m.ultimos30), 'Calificaciones en 30 días'));
+    charts.replaceChildren(distribucion(m), tendencia(m));
+    const T = [['pendientes', 'Por atender', m.pendientes], ['internas', 'Retroalimentación (1-3★)', m.internas], ['google', 'Enviadas a Google (4-5★)', m.google], ['todas', 'Todas', m.total]];
+    tabs.replaceChildren(...T.map(([k, l, n]) => h('button', { class: 'stab rp', type: 'button', role: 'tab', 'aria-selected': String(tipo === k),
+      onclick: () => { tipo = k; draw().catch(fail); } }, l, h('em', {}, String(n)))));
+    const vacio = { pendientes: '¡Todo al día! No hay retroalimentación por atender.', internas: 'Aún no hay retroalimentación de clientes.', google: 'Todavía no hay clientes enviados a Google.', todas: 'Aún no hay calificaciones.' }[tipo];
+    list.replaceChildren(...(items.length ? items.map(item) : [h('div', { class: 'empty' }, icon('star'), h('p', {}, vacio))]));
+  }
+
+  state.refreshResenas = () => draw().catch(() => {});
+  pane.replaceChildren(h('div', { class: 'pane-head' }, h('h2', {}, 'Reseñas'), h('span', { class: 'muted' }, `Enlace para calificar: ${location.origin}/resenas/`)),
+    banner, stats, nota, charts, tabs, list);
+  await draw();
+}
+
+/* ---------- Enlace y código QR ---------- */
+function qrCard(url, { key, title, desc, file }) {
   const qr = qrcode(0, 'M');
   qr.addData(url); qr.make();
   const n = qr.getModuleCount();
@@ -420,20 +538,20 @@ function qrCard() {
     const c = document.createElement('canvas'); c.width = c.height = px;
     const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, px, px); g.fillStyle = '#000';
     for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) if (qr.isDark(r, col)) g.fillRect((col + margin) * cell, (r + margin) * cell, cell, cell);
-    c.toBlob((b) => b && download(b, 'qr-los-plebes.png'), 'image/png');
+    c.toBlob((b) => b && download(b, `${file}.png`), 'image/png');
   };
-  return h('section', { class: 'card qr-card' },
+  return h('section', { class: 'card qr-card', dataset: { qr: key } },
     holder,
     h('div', { class: 'qr-info' },
-      h('h3', {}, 'Tu tarjeta: enlace, QR y NFC'),
-      h('p', { class: 'muted' }, 'Graba este enlace en tu etiqueta NFC e imprime el QR para tu local, tus mesas y tus bolsas.'),
+      h('h3', {}, title),
+      h('p', { class: 'muted' }, desc),
       h('code', { class: 'url' }, url),
       h('div', { class: 'tools' },
         h('button', { class: 'btn sm rp', type: 'button', onclick: async () => {
           try { await navigator.clipboard.writeText(url); toast('Enlace copiado ✓'); } catch { toast(url); }
         } }, 'Copiar enlace'),
         h('button', { class: 'btn sm rp', type: 'button', onclick: png }, 'Descargar QR (PNG)'),
-        h('button', { class: 'btn sm rp', type: 'button', onclick: () => download(new Blob([svg], { type: 'image/svg+xml' }), 'qr-los-plebes.svg') }, 'Descargar (SVG)'))));
+        h('button', { class: 'btn sm rp', type: 'button', onclick: () => download(new Blob([svg], { type: 'image/svg+xml' }), `${file}.svg`) }, 'Descargar (SVG)'))));
 }
 
 /* ---------- Ajustes ---------- */
@@ -441,6 +559,15 @@ async function viewAjustes(pane) {
   const s = await api('/api/admin/ajustes');
   const inp = (k, props = {}) => h('input', { name: k, value: s[k] ?? '', ...props });
   const err = errBox();
+  const placeInput = inp('google_place_id', { placeholder: 'ChIJ…', autocomplete: 'off', spellcheck: false, maxLength: 120 });
+  const testLink = h('a', { class: 'btn sm rp', target: '_blank', rel: 'noopener noreferrer' }, icon('external'), 'Probar el enlace de reseña');
+  const refreshTest = () => {
+    const v = placeInput.value.trim();
+    const ok = /^[A-Za-z0-9_-]{10,120}$/.test(v);
+    testLink.hidden = !ok;
+    if (ok) testLink.href = `https://search.google.com/local/writereview?placeid=${encodeURIComponent(v)}`;
+  };
+  placeInput.addEventListener('input', refreshTest); refreshTest();
   const save = h('button', { class: 'btn primary rp', type: 'submit' }, 'Guardar ajustes');
   const form = h('form', { class: 'form', onsubmit: async (e) => {
     e.preventDefault(); showErr(err, '');
@@ -466,6 +593,10 @@ async function viewAjustes(pane) {
       h('div', { class: 'row2' },
         field('Dirección', inp('direccion', { maxLength: 250 })),
         field('Enlace de Google Reseñas', inp('google_reviews', { type: 'url', placeholder: 'https://g.page/r/…/review' })))),
+    h('section', { class: 'card form' }, h('h3', {}, 'Reseñas de Google'),
+      h('span', { class: 'help muted' }, 'Quien califique con 4 o 5 estrellas será enviado a tu enlace de Google. De 1 a 3 estrellas queda como retroalimentación privada (no se publica) y la ves en la pestaña Reseñas.'),
+      field('ID de lugar de Google (Place ID)', placeInput, 'Búscalo con el "Place ID Finder" de Google (developers.google.com/maps/documentation/javascript/examples/places-placeid-finder): escribe el nombre del negocio y copia el ID, que empieza con ChIJ. Mientras esté vacío no se envía a nadie a Google.'),
+      h('div', {}, testLink)),
     h('section', { class: 'card form' }, h('h3', {}, 'Redes sociales'),
       h('span', { class: 'help muted' }, 'Todos los iconos se ven en la tarjeta. Los que dejes vacíos avisarán "muy pronto" al tocarlos.'),
       h('div', { class: 'row2' },
@@ -474,7 +605,65 @@ async function viewAjustes(pane) {
         field('TikTok', inp('tiktok', { type: 'url', placeholder: 'https://tiktok.com/@…' })),
         field('YouTube', inp('youtube', { type: 'url', placeholder: 'https://youtube.com/@…' })))),
     err, h('div', {}, save));
-  pane.replaceChildren(h('div', { class: 'pane-head' }, h('h2', {}, 'Ajustes')), qrCard(), form);
+  pane.replaceChildren(h('div', { class: 'pane-head' }, h('h2', {}, 'Ajustes')),
+    qrCard(`${location.origin}/`, { key: 'tarjeta', file: 'qr-los-plebes', title: 'Tu tarjeta: enlace, QR y NFC',
+      desc: 'Graba este enlace en tu etiqueta NFC e imprime el QR para tu local, tus mesas y tus bolsas.' }),
+    form);
+}
+
+/* ---------- Usuarios del sistema ---------- */
+function editarUsuario(onSaved) {
+  const email = h('input', { type: 'email', required: true, maxLength: 120, autocomplete: 'off', inputMode: 'email' });
+  const nombre = h('input', { maxLength: 60, autocomplete: 'off' });
+  const clave = h('input', { type: 'password', required: true, minLength: 10, autocomplete: 'new-password' });
+  const err = errBox();
+  modal('Nuevo usuario', h('div', { class: 'form' },
+    field('Correo (con este entra al panel)', email), field('Nombre (opcional)', nombre),
+    field('Contraseña', clave, 'Mínimo 10 caracteres. Compártesela a la persona; podrá cambiarla en Cuenta.'), err),
+  (close) => [h('button', { class: 'btn', type: 'button', onclick: close }, 'Cancelar'),
+    h('button', { class: 'btn primary rp', type: 'button', onclick: async (e) => {
+      showErr(err, '');
+      if (!email.value.trim() || clave.value.length < 10) { showErr(err, 'Escribe el correo y una contraseña de al menos 10 caracteres'); return; }
+      const btn = e.currentTarget; btn.disabled = true;
+      try { await api('/api/admin/usuarios', { method: 'POST', body: { email: email.value, nombre: nombre.value, password: clave.value } }); close(); toast('Usuario creado ✓'); onSaved(); }
+      catch (ex) { showErr(err, ex.message); btn.disabled = false; }
+    } }, 'Crear usuario')]);
+}
+
+function cambiarClaveUsuario(u) {
+  const clave = h('input', { type: 'password', required: true, minLength: 10, autocomplete: 'new-password' });
+  const err = errBox();
+  modal(`Nueva contraseña para ${u.email}`, h('div', { class: 'form' }, field('Contraseña nueva', clave, 'Mínimo 10 caracteres.'), err),
+  (close) => [h('button', { class: 'btn', type: 'button', onclick: close }, 'Cancelar'),
+    h('button', { class: 'btn primary rp', type: 'button', onclick: async (e) => {
+      showErr(err, '');
+      if (clave.value.length < 10) { showErr(err, 'Mínimo 10 caracteres'); return; }
+      const btn = e.currentTarget; btn.disabled = true;
+      try { await api(`/api/admin/usuarios/${u.id}/password`, { method: 'PUT', body: { password: clave.value } }); close(); toast('Contraseña actualizada ✓'); }
+      catch (ex) { showErr(err, ex.message); btn.disabled = false; }
+    } }, 'Guardar')]);
+}
+
+async function usuariosCard() {
+  const list = h('div', { class: 'clist' });
+  const draw = async () => {
+    const usuarios = await api('/api/admin/usuarios');
+    list.replaceChildren(...usuarios.map((u) => h('div', { class: 'crow' },
+      h('div', { class: 't' }, h('b', {}, u.nombre || u.email), h('span', { class: 'muted' }, u.nombre ? u.email : '', u.yo ? (u.nombre ? ' · ' : '') + 'Tú' : '')),
+      u.yo ? null : h('div', { class: 'acts' },
+        h('button', { class: 'btn sm rp', type: 'button', onclick: () => cambiarClaveUsuario(u) }, 'Contraseña'),
+        h('button', { class: 'btn sm danger', type: 'button', onclick: async () => {
+          if (!(await ask(`¿Borrar a ${u.email}?`, 'Esta persona ya no podrá entrar al panel.', 'Sí, borrar'))) return;
+          try { await api(`/api/admin/usuarios/${u.id}`, { method: 'DELETE' }); toast('Usuario borrado'); draw(); } catch (e) { fail(e); }
+        } }, 'Borrar')))));
+  };
+  const card = h('section', { class: 'card', style: 'margin-top:14px;max-width:520px' },
+    h('div', { class: 'bar', style: 'margin-bottom:10px' }, h('h3', { style: 'margin:0' }, 'Usuarios del sistema'),
+      h('button', { class: 'btn sm primary rp', type: 'button', onclick: () => editarUsuario(draw) }, icon('plus'), 'Nuevo usuario')),
+    h('p', { class: 'muted', style: 'margin:0 0 12px' }, 'Todos los usuarios tienen el mismo acceso al panel: pedidos, platillos, reseñas y ajustes.'),
+    list);
+  await draw();
+  return card;
 }
 
 /* ---------- Cuenta ---------- */
@@ -494,7 +683,7 @@ async function viewCuenta(pane) {
     field('Contraseña nueva', h('input', { name: 'nueva', type: 'password', required: true, minLength: 10, autocomplete: 'new-password' }), 'Mínimo 10 caracteres.'),
     field('Repite la nueva', h('input', { name: 'repetir', type: 'password', required: true, minLength: 10, autocomplete: 'new-password' })),
     err, h('div', {}, h('button', { class: 'btn primary rp', type: 'submit' }, 'Cambiar contraseña')));
-  pane.replaceChildren(h('div', { class: 'pane-head' }, h('h2', {}, 'Cuenta')), form,
+  pane.replaceChildren(h('div', { class: 'pane-head' }, h('h2', {}, 'Cuenta')), form, await usuariosCard(),
     h('div', { style: 'margin-top:18px' }, h('button', { class: 'btn danger', type: 'button', onclick: () => logout() }, 'Cerrar sesión')));
 }
 

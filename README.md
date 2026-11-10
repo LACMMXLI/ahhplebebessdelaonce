@@ -10,7 +10,8 @@ Pensado para móvil; el panel también se usa cómodo en escritorio.
 |---|---|---|
 | **Tarjeta** | `/` | Réplica animada del diseño: logo neón, redes, menú, llamar, WhatsApp, cómo llegar, guardar contacto (.vcf) y compartir. Todos los iconos de redes se ven siempre; los que aún no tienen enlace avisan "estará disponible muy pronto" al tocarlos. Funciona aunque el backend esté caído. |
 | **Menú** | `/menu/` | Categorías, fotos, precios, "agotado", carrito con notas, pedido para llevar o comer aquí, confirmación y envío a WhatsApp. |
-| **Panel** | `/admin/` | Pedidos en vivo (aviso con sonido, estados, historial, ventas de hoy), platillos con fotos, categorías, ajustes del negocio, **código QR y enlace para el NFC**, cambio de contraseña. |
+| **Reseñas** | `/resenas/` | El cliente califica de 1 a 5 estrellas. **4-5★** → se le lleva directo al enlace de Google de tu negocio; **1-3★** → formulario privado de retroalimentación. |
+| **Panel** | `/admin/` | Pedidos en vivo (aviso con sonido, estados, historial, ventas de hoy), platillos con fotos, categorías, ajustes del negocio, **código QR y enlace para el NFC**, cambio de contraseña, y la pestaña **Reseñas** (métricas, mensajes de retroalimentación con fecha y contacto, estado "atendida"). |
 
 ## Piezas (cada una se despliega por separado)
 
@@ -63,6 +64,7 @@ Variables (ver `apps/backend/.env.example`):
 | `S3_BUCKET` | `platillos` |
 | `S3_PUBLIC_URL` | `https://files.tudominio.com` |
 | `TRUST_PROXY` | `1` (Traefik de Coolify). Pon `2` si además hay Cloudflare delante |
+| `RATE_LIMIT_REVIEWS` / `RATE_LIMIT_ORDERS` | `10` y `10` (calificaciones y pedidos por IP cada 15 min, anti-spam). No los subas en producción |
 | `BUSINESS_TZ` | `America/Tijuana` (zona para "ventas de hoy") |
 
 Al arrancar aplica las migraciones (`apps/backend/migrations`) y crea las categorías iniciales. No inventa precios: los 3 platillos de ejemplo quedan **ocultos y sin precio**.
@@ -86,6 +88,23 @@ La imagen es la misma en cualquier entorno: `API_URL` y `SITE_URL` se aplican al
 2. **Ajustes**: confirma teléfono y WhatsApp; agrega Facebook, Instagram, TikTok cuando existan (mientras estén vacíos, su icono se ve y avisa "muy pronto"). Ahí mismo están el **enlace y el QR** de la tarjeta para grabar el NFC e imprimir.
 3. **Platillos**: edita los de ejemplo o crea los tuyos (precio obligatorio para publicar) y sube la foto.
 4. Deja el panel abierto en el celular o la tablet del local: avisa con sonido cuando llega un pedido.
+
+## Reseñas de Google
+1. En **Ajustes → Reseñas de Google** captura el **ID de lugar (Place ID)** de tu negocio. Búscalo con el
+   [Place ID Finder de Google](https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder):
+   escribe el nombre del negocio y copia el ID (empieza con `ChIJ…`). Hay un botón para probar el enlace.
+2. Comparte el enlace `https://tudominio.com/resenas/` con tus clientes (el panel lo muestra en la pestaña Reseñas).
+3. **4 y 5 estrellas**: se registra la calificación y se envía al cliente a
+   `https://search.google.com/local/writereview?placeid=<tu ID>`. No se guarda ningún dato personal.
+   Mientras el ID esté vacío no se envía a nadie a Google.
+4. **1 a 3 estrellas**: el cliente deja un mensaje (y opcionalmente nombre y teléfono/correo). Lo ves en la pestaña
+   **Reseñas** → *Por atender*, con fecha, contacto (llamar/WhatsApp) y el pedido relacionado; lo marcas *atendida* o lo borras.
+   Llega un aviso con sonido cuando entra uno nuevo.
+5. Las métricas muestran promedio, distribución de estrellas, últimos 14 días y cuántos clientes fueron enviados a Google.
+   Ojo: eso cuenta **clientes dirigidos a Google**, no reseñas publicadas (Google no avisa cuántos terminan publicando).
+
+> **Aviso sobre las políticas de Google.** Google pide no "filtrar" reseñas (mandar a Google solo a quien califica bien);
+> si lo detecta puede eliminar reseñas o sancionar el perfil. Es una decisión del negocio; aquí solo se deja constancia.
 
 ## Cómo funciona un pedido
 1. El cliente arma el carrito en `/menu/` (se guarda en su navegador).
@@ -113,13 +132,13 @@ cd apps/frontend/public && python3 -m http.server 8080     # config.js apunta a 
 ```
 
 ## Pruebas
-**Backend** (14 pruebas de API con Postgres real; necesitan una base vacía exclusiva):
+**Backend** (15 pruebas de API con Postgres real; necesitan una base vacía exclusiva):
 ```bash
 cd apps/backend && TEST_DATABASE_URL=postgres://user:pass@localhost:5432/plebes_test npm test
 ```
 > Estas pruebas **borran el esquema `public`** de esa base: usa una base solo para tests.
 
-**De punta a punta** (navegador real, ~40 pasos): tarjeta, menú, carrito, pedido, panel, QR, accesibilidad
+**De punta a punta** (navegador real, ~60 pasos): tarjeta, menú, carrito, pedido, reseñas, panel, QR, accesibilidad
 (axe, WCAG 2 AA), desborde horizontal en 360/390/768/1280 px, movimiento reducido, teclado y CSP.
 Corren contra un entorno ya levantado (p. ej. el de `docker-compose.dev.yml`):
 ```bash
@@ -128,6 +147,7 @@ npm test                                   # usa http://localhost:8080 y http://
 BASE_URL=https://tudominio.com API_URL=https://api.tudominio.com ADMIN_EMAIL=… ADMIN_PASSWORD=… npm test
 SHOTS_DIR=./capturas npm test              # además guarda capturas de pantalla
 ```
+Para repetirlas seguido necesitan `RATE_LIMIT_REVIEWS` y `RATE_LIMIT_ORDERS` altos en el backend (el compose de desarrollo ya lo trae).
 Crean sus propios datos (`E2E-…`) y los borran; los pedidos de prueba quedan en el historial, así que
 úsalas en desarrollo o en un entorno de pruebas.
 

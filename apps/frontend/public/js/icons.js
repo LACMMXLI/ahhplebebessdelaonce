@@ -40,6 +40,8 @@ const ICONS = {
   external: V('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>', '0 0 24 24', STROKE),
   bell: V('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>', '0 0 24 24', STROKE),
 
+  star: V('<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/>', '0 0 24 24', 'fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"'),
+
   /* ---- Ilustraciones decorativas del diseño ---- */
   map: V('<path d="M8 30 36 22l26 8 26-8 22 8v46l-22-8-26 8-26-8-28 8z" fill="#cfd5dc"/><path d="M8 30 36 22v46L8 76z" fill="#5fb85a"/><path d="M36 22l26 8v46L36 68z" fill="#4a9be0"/><path d="m62 30 26-8v46l-26 8z" fill="#f2c64a"/><path d="m88 22 22 8v46l-22-8z" fill="#7fc66a"/><path d="M36 22l26 8M62 30l26-8" stroke="#fff" stroke-width="1.500" opacity=".7"/><g transform="translate(62 2)"><path d="M18 0C8 0 1 7.500 1 17c0 12 17 30 17 30s17-18 17-30C35 7.500 28 0 18 0z" fill="#e0262e"/><circle cx="18" cy="17" r="6" fill="#fff"/></g>', '0 0 118 84'),
   phoneArt: V('<g transform="rotate(8 60 80)" fill="none" stroke="currentColor" stroke-width="5"><rect x="34" y="12" width="56" height="104" rx="12"/><path d="M34 28h56M34 100h56" opacity=".6"/><circle cx="62" cy="60" r="10"/><path d="M44 92c2-12 8-17 18-17s16 5 18 17" stroke-linecap="round"/></g>', '0 0 120 130'),

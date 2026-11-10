@@ -25,6 +25,8 @@ services:
       DATABASE_URL: postgres://plebes:plebes@db:5432/plebes
       JWT_SECRET: dev-secret-dev-secret-dev-secret-dev-secret
       CORS_ORIGINS: http://localhost:8080
+      RATE_LIMIT_REVIEWS: "200"   # solo desarrollo: permite correr las pruebas E2E varias veces
+      RATE_LIMIT_ORDERS: "200"
       ADMIN_EMAIL: dueno@example.com
       ADMIN_PASSWORD: cambia-esta-contraseña
       S3_ENDPOINT: http://storage:9000
