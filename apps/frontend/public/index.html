@@ -19,23 +19,26 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preload" href="fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/logo.webp" as="image">
-<link rel="stylesheet" href="css/base.css?v=3">
-<link rel="stylesheet" href="css/card.css?v=3">
-<noscript><style>.rv{opacity:1!important;transform:none!important}.panel,.food,.logo{animation:none!important}</style></noscript>
+<link rel="stylesheet" href="css/base.css?v=4">
+<link rel="stylesheet" href="css/card.css?v=4">
+<noscript><style>.rv{opacity:1!important;transform:none!important}.panel,.panel *,.food,.logo{animation:none!important}</style></noscript>
 </head>
 <body>
-<div class="ambient" aria-hidden="true"></div>
+<div class="ambient" aria-hidden="true"><i class="aur a1"></i><i class="aur a2"></i></div>
 <canvas id="embers" aria-hidden="true"></canvas>
 <main class="stage">
   <header class="hero" aria-label="Los Plebes de la Once">
     <div class="food left" aria-hidden="true"></div>
     <div class="food right" aria-hidden="true"></div>
     <div class="lamp l" aria-hidden="true"></div><div class="lamp r" aria-hidden="true"></div>
+    <div class="rays" aria-hidden="true"></div>
     <div class="stage-glow" aria-hidden="true"></div>
     <div class="logo">
       <div class="logo-float">
+        <i class="logo-halo" aria-hidden="true"></i><i class="orbit o1" aria-hidden="true"></i><i class="orbit o2" aria-hidden="true"></i>
         <i class="logo-ring" aria-hidden="true"></i><i class="logo-ring sharp" aria-hidden="true"></i>
         <img src="assets/logo.webp" width="640" height="640" alt="Logo de Los Plebes de la Once: neón con corona, hamburguesa, papas y hot dog" fetchpriority="high">
+        <i class="logo-gloss" aria-hidden="true"></i>
       </div>
     </div>
   </header>
@@ -45,7 +48,7 @@
     <noscript><p>Llámanos al <a href="tel:+526862029161">686 202 9161</a>. Prolongación H. Colegio Militar #1242, Col. Voluntad, Mexicali, B.C.</p></noscript>
   </section>
 </main>
-<script src="config.js?v=3"></script>
-<script type="module" src="js/card.js?v=3"></script>
+<script src="config.js?v=4"></script>
+<script type="module" src="js/card.js?v=4"></script>
 </body>
 </html>

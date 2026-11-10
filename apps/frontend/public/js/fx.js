@@ -66,7 +66,11 @@ export function embers() {
 export function reveal(root = document) {
   const els = [...root.querySelectorAll('.rv:not(.in)')];
   els.forEach((el, i) => el.style.setProperty('--i', String(Math.min(i, 8))));
-  if (reduced || !('IntersectionObserver' in window)) { els.forEach((el) => el.classList.add('in')); return; }
+  if (reduced || !('IntersectionObserver' in window)) { els.forEach((el) => el.classList.add('in', 'shown')); return; }
+  // Al terminar la entrada se suelta la animación para que el elemento pueda inclinarse o elevarse.
+  els.forEach((el) => el.addEventListener('animationend', (e) => {
+    if (e.target === el && e.animationName === 'rise') el.classList.add('shown');
+  }));
   const io = new IntersectionObserver((entries) => {
     for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
   }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
@@ -87,6 +91,88 @@ export function ripples() {
     host.append(dot);
     dot.addEventListener('animationend', () => dot.remove(), { once: true });
   }, { passive: true });
+}
+
+/* ---------- Chispas al tocar ---------- */
+export function sparks() {
+  if (reduced || !Element.prototype.animate) return;
+  document.addEventListener('pointerdown', (e) => {
+    const host = e.target.closest?.('.rp');
+    if (!host || host.disabled) return;
+    const color = getComputedStyle(host).getPropertyValue('--c').trim() || '#ffd24a';
+    const n = 9;
+    for (let i = 0; i < n; i++) {
+      const dot = document.createElement('span');
+      const size = 3 + Math.random() * 4;
+      dot.style.cssText = `position:fixed;z-index:120;left:${e.clientX - size / 2}px;top:${e.clientY - size / 2}px;width:${size}px;height:${size}px;border-radius:50%;pointer-events:none;background:${color};box-shadow:0 0 10px ${color}`;
+      document.body.append(dot);
+      const ang = (i / n) * Math.PI * 2 + Math.random() * 0.6;
+      const dist = 34 + Math.random() * 46;
+      const dx = Math.cos(ang) * dist; const dy = Math.sin(ang) * dist;
+      const anim = dot.animate([
+        { transform: 'translate(0,0) scale(1)', opacity: 1 },
+        { transform: `translate(${dx}px,${dy + 18}px) scale(0)`, opacity: 0 },
+      ], { duration: 520 + Math.random() * 280, easing: 'cubic-bezier(.15,.7,.3,1)' });
+      anim.onfinish = () => dot.remove();
+      anim.oncancel = () => dot.remove();
+    }
+  }, { passive: true });
+}
+
+/* ---------- Brillo que sigue al puntero e inclinación 3D (solo con mouse) ---------- */
+export function pointerFx() {
+  if (reduced) return;
+  const fine = matchMedia('(hover:hover) and (pointer:fine)').matches;
+  let tilted = null; let raf = 0; let ev = null;
+  const reset = () => { if (tilted) { tilted.style.transform = ''; tilted = null; } };
+  const apply = () => {
+    raf = 0;
+    const e = ev; if (!e) return;
+    const t = e.target instanceof Element ? e.target : null;
+    const host = t?.closest('.rp');
+    if (host) {
+      const r = host.getBoundingClientRect();
+      host.style.setProperty('--gx', `${e.clientX - r.left}px`);
+      host.style.setProperty('--gy', `${e.clientY - r.top}px`);
+    }
+    const panel = t?.closest('.panel');
+    if (panel) {
+      const r = panel.getBoundingClientRect();
+      panel.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      panel.style.setProperty('--my', `${e.clientY - r.top}px`);
+    }
+    if (!fine) return;
+    const el = t?.closest('.tilt');
+    if (el !== tilted) reset();
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5; const py = (e.clientY - r.top) / r.height - 0.5;
+      el.style.transform = `perspective(900px) rotateX(${(-py * 7).toFixed(2)}deg) rotateY(${(px * 5).toFixed(2)}deg) translateY(-2px)`;
+      tilted = el;
+    }
+  };
+  const on = (e) => { ev = e; if (!raf) raf = requestAnimationFrame(apply); };
+  document.addEventListener('pointermove', on, { passive: true });
+  document.addEventListener('pointerdown', on, { passive: true });
+  document.addEventListener('pointerleave', reset);
+  addEventListener('blur', reset);
+}
+
+/* ---------- Profundidad en la portada: se mueve con el scroll y con el puntero ---------- */
+export function parallax(hero) {
+  if (!hero || reduced) return;
+  let raf = 0; let px = 0; let py = 0;
+  const apply = () => {
+    raf = 0;
+    hero.style.setProperty('--sy', String(Math.max(0, Math.min(scrollY, 420))));
+    hero.style.setProperty('--px', px.toFixed(3));
+    hero.style.setProperty('--py', py.toFixed(3));
+  };
+  const queue = () => { if (!raf) raf = requestAnimationFrame(apply); };
+  addEventListener('scroll', queue, { passive: true });
+  if (matchMedia('(hover:hover) and (pointer:fine)').matches) {
+    addEventListener('pointermove', (e) => { px = e.clientX / innerWidth - 0.5; py = e.clientY / innerHeight - 0.5; queue(); }, { passive: true });
+  }
 }
 
 /** Cierra un <dialog> con animación de salida. */
